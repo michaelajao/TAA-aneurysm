@@ -23,8 +23,8 @@ model:
   fourier_scale: 10.0
   device: cuda
 training:
-  batch_size: 512
-  wall_batch_size: 1000
+  batch_size: 4096
+  wall_batch_size: 8000
   epochs: 10000
   learning_rate: 0.0001
   scheduler:
@@ -51,8 +51,8 @@ loss_weights:
 physics:
   mu: 0.00125
   rho: 1.0
-  n_interior_points: 1000
-  interior_batch_size: 500
+  n_interior_points: 2000
+  interior_batch_size: 2000
   interior_offset_range:
   - 0.05
   - 0.5

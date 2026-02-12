@@ -42,8 +42,8 @@ model:
 # Training configuration
 training:
   # Batch size and epochs
-  batch_size: 512  # Batch size for wall points in loss computation
-  wall_batch_size: 1000  # Number of wall points to process at once for WSS loss
+  batch_size: 4096  # Batch size for wall points in loss computation
+  wall_batch_size: 8000  # Number of wall points to process at once for WSS loss
   epochs: 10000
 
   # Learning rate and scheduling
@@ -89,8 +89,8 @@ physics:
   rho: 1.0  # Density (normalized)
 
   # Interior collocation points for physics loss
-  n_interior_points: 1000  # Number of interior points to sample
-  interior_batch_size: 500  # Batch size for physics loss computation
+  n_interior_points: 2000  # Number of interior points to sample
+  interior_batch_size: 2000  # Batch size for physics loss computation
   interior_offset_range: [0.05, 0.5]  # Offset from wall (in normalized coordinates)
 
 # Geometry utilities

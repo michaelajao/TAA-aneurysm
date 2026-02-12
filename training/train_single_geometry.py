@@ -226,6 +226,15 @@ class TAATrainer:
         print(f"Optimizer: Adam (β=(0.9, 0.99), ε=1e-15)")
         print(f"Scheduler: {self.config['training']['scheduler']['type']}")
 
+        # AMP (Automatic Mixed Precision)
+        self.use_amp = self.config['training'].get('use_amp', False)
+        if self.use_amp:
+            self.scaler = torch.amp.GradScaler('cuda')
+            print("Mixed precision (AMP): ENABLED")
+        else:
+            self.scaler = None
+            print("Mixed precision (AMP): disabled")
+
     def compute_total_loss(self, phase='diastolic'):
         """
         Compute total loss for a given phase.
@@ -354,36 +363,48 @@ class TAATrainer:
         return total_loss, loss_dict, wss_pred
 
     def train_epoch(self):
-        """Train for one epoch."""
+        """Train for one epoch. Returns (avg_loss, list_of_loss_dicts)."""
         # Train on both phases
         total_loss_sum = 0.0
+        phase_dicts = []
 
         for phase in self.config['data']['phases']:
             # Zero gradients
             for opt in self.optimizers.values():
-                opt.zero_grad()
+                opt.zero_grad(set_to_none=True)
 
-            # Compute loss
-            total_loss, loss_dict, _ = self.compute_total_loss(phase)
-
-            # Backward pass
-            total_loss.backward()
-
-            # Gradient clipping
-            if self.config['training']['gradient_clip'] > 0:
-                for net in self.networks.values():
-                    nn.utils.clip_grad_norm_(
-                        net.parameters(),
-                        self.config['training']['gradient_clip']
-                    )
-
-            # Optimizer step
-            for opt in self.optimizers.values():
-                opt.step()
+            # Compute loss (with AMP if enabled)
+            if self.use_amp:
+                with torch.amp.autocast('cuda'):
+                    total_loss, loss_dict, _ = self.compute_total_loss(phase)
+                self.scaler.scale(total_loss).backward()
+                if self.config['training']['gradient_clip'] > 0:
+                    self.scaler.unscale_(self.optimizers['u'])
+                    for net in self.networks.values():
+                        nn.utils.clip_grad_norm_(
+                            net.parameters(),
+                            self.config['training']['gradient_clip']
+                        )
+                for opt in self.optimizers.values():
+                    self.scaler.step(opt)
+                self.scaler.update()
+            else:
+                total_loss, loss_dict, _ = self.compute_total_loss(phase)
+                total_loss.backward()
+                if self.config['training']['gradient_clip'] > 0:
+                    for net in self.networks.values():
+                        nn.utils.clip_grad_norm_(
+                            net.parameters(),
+                            self.config['training']['gradient_clip']
+                        )
+                for opt in self.optimizers.values():
+                    opt.step()
 
             total_loss_sum += loss_dict['total']
+            phase_dicts.append(loss_dict)
 
-        return total_loss_sum / len(self.config['data']['phases'])
+        avg_loss = total_loss_sum / len(self.config['data']['phases'])
+        return avg_loss, phase_dicts
 
     def evaluate(self):
         """Evaluate on training data and print detailed metrics (no held-out set)."""
@@ -544,8 +565,8 @@ class TAATrainer:
         for epoch in pbar:
             self.epoch = epoch
 
-            # Train one epoch
-            avg_loss = self.train_epoch()
+            # Train one epoch (returns cached loss dicts — no redundant forward passes)
+            avg_loss, phase_dicts = self.train_epoch()
 
             # Update learning rate schedulers
             for scheduler in self.schedulers.values():
@@ -553,12 +574,7 @@ class TAATrainer:
 
             lr = self.optimizers['u'].param_groups[0]['lr']
 
-            # Record loss history every epoch
-            # Average loss_dict across phases for this epoch
-            phase_dicts = []
-            for phase in self.config['data']['phases']:
-                _, ld, _ = self.compute_total_loss(phase)
-                phase_dicts.append(ld)
+            # Record loss history from the dicts already computed in train_epoch
             avg_dict = {k: np.mean([d[k] for d in phase_dicts])
                         for k in phase_dicts[0]}
             self.loss_history.append({
