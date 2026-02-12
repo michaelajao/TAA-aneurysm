@@ -865,6 +865,112 @@ For questions or issues:
 
 ---
 
+## Multi-GPU Training on HPC (brosnan.coventry.ac.uk)
+
+### Current Setup
+
+**Environment**: `deep_tf` conda environment (has open3d installed)
+
+### Running Training Jobs
+
+**GPU0: Resume AS5 from epoch 1000**
+```bash
+nohup bash -lc "source ~/miniconda3/etc/profile.d/conda.sh; conda activate deep_tf; CUDA_VISIBLE_DEVICES=0 python training/train_single_geometry.py --config configs/AS5_config.yaml --resume experiments/AS5_baseline/checkpoint_epoch_1000.pt" > hpc/logs/as5_resume_gpu0.log 2>&1 &
+```
+
+**GPU1: Run all remaining geometries (AD5, PD5, AS6, AD6, PD6)**
+```bash
+CUDA_VISIBLE_DEVICES=1 GEOMS_LIST="AD5 PD5 AS6 AD6 PD6" nohup bash hpc/run_all_geometries_detached.sh > hpc/logs/others_gpu1.log 2>&1 &
+```
+
+### Monitoring Running Jobs
+
+**Check log files:**
+```bash
+# AS5 on GPU0
+tail -f hpc/logs/as5_resume_gpu0.log
+
+# Other geometries on GPU1
+tail -f hpc/logs/others_gpu1.log
+
+# Check last 50 lines
+tail -50 hpc/logs/as5_resume_gpu0.log
+```
+
+**Check GPU usage:**
+```bash
+nvidia-smi
+
+# Watch GPU usage in real-time (updates every 2 seconds)
+watch -n 2 nvidia-smi
+```
+
+**Check running processes:**
+```bash
+ps aux | grep train_single_geometry
+
+# Check background jobs
+jobs -l
+```
+
+**Kill a job if needed:**
+```bash
+# Find the process ID (PID)
+ps aux | grep train_single_geometry
+
+# Kill it
+kill <PID>
+
+# Force kill if not responding
+kill -9 <PID>
+```
+
+### Saved Metrics and Outputs
+
+**During Training (every epoch):**
+- `experiments/<geometry>_baseline/loss_history.csv` - Full training metrics
+  - Columns: epoch, total, wss, physics, bc_noslip, pressure, residual_momentum_x/y/z, residual_continuity, lr
+
+**Checkpoints (every 1000 epochs):**
+- `experiments/<geometry>_baseline/checkpoint_epoch_1000.pt`
+- `experiments/<geometry>_baseline/checkpoint_epoch_2000.pt`
+- Contains: network weights, optimizer state, scheduler state, loss history, epoch number
+
+**Final Outputs:**
+- `experiments/<geometry>_baseline/loss_history.csv` - Complete training log
+- `experiments/<geometry>_baseline/loss_curves.png` - Training curve plots
+- `experiments/<geometry>_baseline/best_model.pt` - Best model by validation loss
+- `experiments/<geometry>_baseline/final_model.pt` - Final trained model
+
+**Accessing Metrics:**
+```python
+import pandas as pd
+
+# Load training history
+df = pd.read_csv('experiments/AS5_baseline/loss_history.csv')
+
+# Plot WSS loss over time
+import matplotlib.pyplot as plt
+plt.plot(df['epoch'], df['wss'])
+plt.xlabel('Epoch')
+plt.ylabel('WSS Loss')
+plt.yscale('log')
+plt.show()
+
+# Find best epoch
+best_epoch = df.loc[df['total'].idxmin(), 'epoch']
+print(f"Best epoch: {best_epoch}")
+```
+
+**Resume from Specific Checkpoint:**
+```bash
+python training/train_single_geometry.py \
+  --config configs/AS5_config.yaml \
+  --resume experiments/AS5_baseline/checkpoint_epoch_5000.pt
+```
+
+---
+
 **Last Updated**: February 2026
 
 **Status**: ✅ Fully Functional - Ready for Training
