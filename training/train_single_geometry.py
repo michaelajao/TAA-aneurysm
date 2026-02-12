@@ -1,0 +1,644 @@
+"""
+Main Training Script for Single Geometry TAA-PINN
+
+Integrates all components:
+- Data loading
+- Network initialization
+- Loss functions
+- Training loop
+- Logging and checkpointing
+"""
+
+import csv as csv_mod
+import os
+import sys
+import yaml
+import time
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from pathlib import Path
+from tqdm import tqdm
+
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import custom modules
+from data_loaders.csv_loader import TAADataLoader
+from utils.geometry_utils import compute_wall_normals_torch, sample_interior_points_torch
+from models.base_networks import create_taa_networks, count_parameters
+from loss_functions.wss_loss import compute_wss_loss, compute_wss_metrics
+from loss_functions.physics_loss import compute_physics_loss
+from loss_functions.boundary_loss import compute_noslip_loss, compute_pressure_loss
+
+
+class TAATrainer:
+    """Trainer class for TAA-PINN."""
+
+    def __init__(self, config_path, resume_checkpoint=None):
+        """
+        Initialize trainer from configuration file.
+
+        Args:
+            config_path: Path to YAML configuration file
+        """
+        # Load configuration
+        with open(config_path, 'r') as f:
+            self.config = yaml.safe_load(f)
+
+        print("=" * 70)
+        print("TAA-PINN TRAINING")
+        print("=" * 70)
+        print(f"\nExperiment: {self.config['experiment']['name']}")
+        print(f"Description: {self.config['experiment']['description']}")
+        print(f"Geometry: {self.config['data']['geometry']}")
+
+        # Set random seed
+        torch.manual_seed(self.config['random_seed'])
+        np.random.seed(self.config['random_seed'])
+
+        # Set device
+        self.device = self.config['model']['device']
+        if self.device == 'cuda' and not torch.cuda.is_available():
+            print("CUDA not available, using CPU")
+            self.device = 'cpu'
+
+        print(f"Device: {self.device}")
+
+        # Create output directory
+        self.output_dir = Path(self.config['training']['output_dir'])
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Output directory: {self.output_dir}")
+
+        # Save configuration to output directory
+        config_save_path = self.output_dir / "config.yaml"
+        with open(config_save_path, 'w') as f:
+            yaml.dump(self.config, f)
+
+        # Initialize components
+        self._load_data()
+        self._initialize_networks()
+        self._initialize_optimizers()
+
+        # Training state
+        self.epoch = 0
+        self.best_loss = float('inf')
+        self.loss_history = []  # list of dicts, one per epoch
+        self.start_epoch = 1
+
+        # Early stopping configuration
+        early_cfg = self.config['training'].get('early_stopping', {})
+        self.early_stopping_enabled = early_cfg.get('enabled', False)
+        self.early_stopping_patience = int(early_cfg.get('patience', 1000))
+        self.early_stopping_min_delta = float(early_cfg.get('min_delta', 0.0))
+        self.early_stopping_warmup_epochs = int(early_cfg.get('warmup_epochs', 0))
+        self.no_improve_count = 0
+
+        # Optional resume
+        if resume_checkpoint:
+            self.load_checkpoint(resume_checkpoint)
+
+        print("\nInitialization complete!")
+
+    def _load_data(self):
+        """Load and prepare training data."""
+        print("\n" + "-" * 70)
+        print("LOADING DATA")
+        print("-" * 70)
+
+        # Initialize data loader
+        loader = TAADataLoader(
+            data_dir=self.config['data']['data_dir'],
+            geometry_scale=self.config['data']['normalization']['length_scale'],
+            pressure_scale=self.config['data']['normalization']['pressure_scale'],
+            wss_scale=self.config['data']['normalization']['wss_scale'],
+            device=self.device
+        )
+
+        # Load both phases
+        self.data = {}
+        for phase in self.config['data']['phases']:
+            filename = self.config['data']['files'][phase]
+            print(f"\nLoading {phase}: {filename}")
+
+            data = loader.load_single_case(
+                filename,
+                subsample_factor=self.config['data']['subsample_factor']
+            )
+
+            # Prepare tensors
+            tensors = loader.prepare_tensors(data, include_phase=True)
+
+            # Compute wall normals
+            print(f"Computing wall normals...")
+            normals = compute_wall_normals_torch(
+                tensors['x'], tensors['y'], tensors['z'],
+                radius=self.config['geometry']['normal_estimation']['radius'],
+                max_nn=self.config['geometry']['normal_estimation']['max_nn'],
+                orient_inward=self.config['geometry']['normal_estimation']['orient_inward'],
+                device=self.device
+            )
+            tensors['normals'] = normals
+
+            # Sample interior points for physics loss
+            print(f"Sampling interior collocation points...")
+            x_int, y_int, z_int = sample_interior_points_torch(
+                tensors['x'], tensors['y'], tensors['z'],
+                n_samples=self.config['physics']['n_interior_points'],
+                offset_range=self.config['physics']['interior_offset_range'],
+                normals=normals,
+                seed=self.config['random_seed'],
+                device=self.device
+            )
+
+            tensors['x_interior'] = x_int
+            tensors['y_interior'] = y_int
+            tensors['z_interior'] = z_int
+            tensors['phase_interior'] = tensors['phase'][:self.config['physics']['n_interior_points']]
+
+            self.data[phase] = tensors
+
+            # Print statistics
+            print(f"  Wall points: {tensors['x'].shape[0]}")
+            print(f"  Interior points: {x_int.shape[0]}")
+            print(f"  Normals computed: {normals.shape}")
+            print(f"  Phase encoding: {tensors['phase'][0].item()}")
+
+        print(f"\nData loading complete!")
+
+    def _initialize_networks(self):
+        """Initialize neural networks."""
+        print("\n" + "-" * 70)
+        print("INITIALIZING NETWORKS")
+        print("-" * 70)
+
+        self.networks = create_taa_networks(
+            input_dim=self.config['model']['input_dim'],
+            hidden_dim=self.config['model']['hidden_dim'],
+            num_layers=self.config['model']['num_layers'],
+            num_frequencies=self.config['model']['num_frequencies'],
+            fourier_scale=self.config['model']['fourier_scale'],
+            use_fourier=self.config['model']['use_fourier'],
+            device=self.device
+        )
+
+        # Print network information
+        for name, net in self.networks.items():
+            n_params = count_parameters(net)
+            print(f"  Net_{name}: {n_params:,} parameters")
+
+        total_params = sum(count_parameters(net) for net in self.networks.values())
+        print(f"  Total: {total_params:,} parameters")
+
+    def _initialize_optimizers(self):
+        """Initialize optimizers and schedulers."""
+        print("\n" + "-" * 70)
+        print("INITIALIZING OPTIMIZERS")
+        print("-" * 70)
+
+        lr = self.config['training']['learning_rate']
+        print(f"Learning rate: {lr}")
+
+        self.optimizers = {}
+        self.schedulers = {}
+
+        for name, net in self.networks.items():
+            # Adam optimizer with settings from original PINN-wss
+            self.optimizers[name] = optim.Adam(
+                net.parameters(),
+                lr=lr,
+                betas=(0.9, 0.99),
+                eps=1e-15
+            )
+
+            # Learning rate scheduler
+            if self.config['training']['scheduler']['type'] == 'StepLR':
+                self.schedulers[name] = optim.lr_scheduler.StepLR(
+                    self.optimizers[name],
+                    step_size=self.config['training']['scheduler']['step_size'],
+                    gamma=self.config['training']['scheduler']['gamma']
+                )
+
+        print(f"Optimizer: Adam (β=(0.9, 0.99), ε=1e-15)")
+        print(f"Scheduler: {self.config['training']['scheduler']['type']}")
+
+    def compute_total_loss(self, phase='diastolic'):
+        """
+        Compute total loss for a given phase.
+
+        Args:
+            phase: 'systolic' or 'diastolic'
+
+        Returns:
+            total_loss: Total weighted loss
+            loss_dict: Dictionary of individual losses
+        """
+        tensors = self.data[phase]
+        weights = self.config['loss_weights']
+        physics_params = self.config['physics']
+        norm = self.config['data']['normalization']
+
+        # WSS Loss (CRITICAL) - Process in batches to save memory
+        wall_batch_size = self.config['training'].get('wall_batch_size', 2000)
+        n_wall_points = tensors['x'].shape[0]
+
+        loss_wss_total = 0.0
+        wss_pred_list = []
+
+        for i in range(0, n_wall_points, wall_batch_size):
+            end_idx = min(i + wall_batch_size, n_wall_points)
+
+            loss_wss_batch, wss_pred_batch = compute_wss_loss(
+                self.networks['u'], self.networks['v'], self.networks['w'],
+                tensors['x'][i:end_idx], tensors['y'][i:end_idx], tensors['z'][i:end_idx],
+                tensors['phase'][i:end_idx],
+                tensors['wss_x'][i:end_idx], tensors['wss_y'][i:end_idx], tensors['wss_z'][i:end_idx],
+                tensors['normals'][i:end_idx],
+                mu=physics_params['mu'],
+                X_scale=norm['length_scale'],
+                Y_scale=norm['length_scale'],
+                Z_scale=norm['length_scale'],
+                U_scale=norm['velocity_scale']
+            )
+
+            loss_wss_total += loss_wss_batch * (end_idx - i) / n_wall_points
+            wss_pred_list.append(wss_pred_batch.detach())
+
+        loss_wss = loss_wss_total
+        wss_pred = torch.cat(wss_pred_list, dim=0)
+
+        # Physics Loss (Navier-Stokes) - Process in batches
+        interior_batch_size = physics_params.get('interior_batch_size', 500)
+        n_interior_points = tensors['x_interior'].shape[0]
+
+        loss_physics_total = 0.0
+        residual_sums = {'momentum_x': 0.0, 'momentum_y': 0.0, 'momentum_z': 0.0, 'continuity': 0.0}
+
+        for i in range(0, n_interior_points, interior_batch_size):
+            end_idx = min(i + interior_batch_size, n_interior_points)
+
+            loss_physics_batch, residuals_batch = compute_physics_loss(
+                self.networks['u'], self.networks['v'], self.networks['w'], self.networks['p'],
+                tensors['x_interior'][i:end_idx], tensors['y_interior'][i:end_idx],
+                tensors['z_interior'][i:end_idx], tensors['phase_interior'][i:end_idx],
+                rho=physics_params['rho'],
+                mu=physics_params['mu'],
+                X_scale=norm['length_scale'],
+                Y_scale=norm['length_scale'],
+                Z_scale=norm['length_scale'],
+                U_scale=norm['velocity_scale']
+            )
+
+            loss_physics_total += loss_physics_batch * (end_idx - i) / n_interior_points
+
+            for key in residual_sums:
+                residual_sums[key] += residuals_batch[key] * (end_idx - i) / n_interior_points
+
+        loss_physics = loss_physics_total
+        residuals = residual_sums
+
+        # No-slip BC Loss - Process in batches
+        loss_bc_total = 0.0
+        for i in range(0, n_wall_points, wall_batch_size):
+            end_idx = min(i + wall_batch_size, n_wall_points)
+
+            loss_bc_batch = compute_noslip_loss(
+                self.networks['u'], self.networks['v'], self.networks['w'],
+                tensors['x'][i:end_idx], tensors['y'][i:end_idx], tensors['z'][i:end_idx],
+                tensors['phase'][i:end_idx]
+            )
+            loss_bc_total += loss_bc_batch * (end_idx - i) / n_wall_points
+
+        loss_bc = loss_bc_total
+
+        # Pressure Loss - Process in batches
+        loss_pressure_total = 0.0
+        for i in range(0, n_wall_points, wall_batch_size):
+            end_idx = min(i + wall_batch_size, n_wall_points)
+
+            loss_pressure_batch = compute_pressure_loss(
+                self.networks['p'],
+                tensors['x'][i:end_idx], tensors['y'][i:end_idx], tensors['z'][i:end_idx],
+                tensors['phase'][i:end_idx],
+                tensors['pressure'][i:end_idx]
+            )
+            loss_pressure_total += loss_pressure_batch * (end_idx - i) / n_wall_points
+
+        loss_pressure = loss_pressure_total
+
+        # Total weighted loss
+        total_loss = (
+            weights['lambda_WSS'] * loss_wss +
+            weights['lambda_physics'] * loss_physics +
+            weights['lambda_BC_noslip'] * loss_bc +
+            weights['lambda_pressure'] * loss_pressure
+        )
+
+        # Loss dictionary for logging
+        loss_dict = {
+            'total': total_loss.item(),
+            'wss': loss_wss.item(),
+            'physics': loss_physics.item(),
+            'bc_noslip': loss_bc.item(),
+            'pressure': loss_pressure.item(),
+            'residual_momentum_x': residuals['momentum_x'],
+            'residual_momentum_y': residuals['momentum_y'],
+            'residual_momentum_z': residuals['momentum_z'],
+            'residual_continuity': residuals['continuity']
+        }
+
+        return total_loss, loss_dict, wss_pred
+
+    def train_epoch(self):
+        """Train for one epoch."""
+        # Train on both phases
+        total_loss_sum = 0.0
+
+        for phase in self.config['data']['phases']:
+            # Zero gradients
+            for opt in self.optimizers.values():
+                opt.zero_grad()
+
+            # Compute loss
+            total_loss, loss_dict, _ = self.compute_total_loss(phase)
+
+            # Backward pass
+            total_loss.backward()
+
+            # Gradient clipping
+            if self.config['training']['gradient_clip'] > 0:
+                for net in self.networks.values():
+                    nn.utils.clip_grad_norm_(
+                        net.parameters(),
+                        self.config['training']['gradient_clip']
+                    )
+
+            # Optimizer step
+            for opt in self.optimizers.values():
+                opt.step()
+
+            total_loss_sum += loss_dict['total']
+
+        return total_loss_sum / len(self.config['data']['phases'])
+
+    def evaluate(self):
+        """Evaluate on training data and print detailed metrics (no held-out set)."""
+        print("\n" + "=" * 70)
+        print(f"EVALUATION - Epoch {self.epoch}")
+        print("=" * 70)
+
+        for phase in self.config['data']['phases']:
+            print(f"\n{phase.upper()}:")
+
+            # Compute losses (gradients needed for WSS)
+            _, loss_dict, wss_pred = self.compute_total_loss(phase)
+
+            # Print losses
+            print(f"  Losses:")
+            print(f"    Total:    {loss_dict['total']:.6f}")
+            print(f"    WSS:      {loss_dict['wss']:.6f}")
+            print(f"    Physics:  {loss_dict['physics']:.6f}")
+            print(f"    BC:       {loss_dict['bc_noslip']:.6f}")
+            print(f"    Pressure: {loss_dict['pressure']:.6f}")
+
+            # Compute WSS metrics
+            tensors = self.data[phase]
+            wss_true = torch.cat([tensors['wss_x'], tensors['wss_y'], tensors['wss_z']], dim=1)
+            metrics = compute_wss_metrics(wss_pred, wss_true)
+
+            print(f"  WSS Metrics:")
+            print(f"    Relative L2: {metrics['relative_l2']:.4f}")
+            print(f"    Correlation: {metrics['correlation']:.4f}")
+            print(f"    MAE:         {metrics['mae']:.6f}")
+            print(f"    RMSE:        {metrics['rmse']:.6f}")
+
+            print(f"  Physics Residuals:")
+            print(f"    Momentum X: {loss_dict['residual_momentum_x']:.6f}")
+            print(f"    Momentum Y: {loss_dict['residual_momentum_y']:.6f}")
+            print(f"    Momentum Z: {loss_dict['residual_momentum_z']:.6f}")
+            print(f"    Continuity: {loss_dict['residual_continuity']:.6f}")
+
+    def save_checkpoint(self, filename='checkpoint.pt'):
+        """Save training checkpoint."""
+        checkpoint = {
+            'epoch': self.epoch,
+            'config': self.config,
+            'networks': {name: net.state_dict() for name, net in self.networks.items()},
+            'optimizers': {name: opt.state_dict() for name, opt in self.optimizers.items()},
+            'schedulers': {name: sch.state_dict() for name, sch in self.schedulers.items()},
+            'best_loss': self.best_loss,
+            'loss_history': self.loss_history,
+            'no_improve_count': self.no_improve_count
+        }
+
+        filepath = self.output_dir / filename
+        torch.save(checkpoint, filepath)
+        print(f"\nCheckpoint saved: {filepath}")
+
+    def load_checkpoint(self, checkpoint_path):
+        """Load training checkpoint and resume state."""
+        checkpoint_path = Path(checkpoint_path)
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+
+        checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
+
+        for name in self.networks:
+            self.networks[name].load_state_dict(checkpoint['networks'][name])
+
+        for name in self.optimizers:
+            self.optimizers[name].load_state_dict(checkpoint['optimizers'][name])
+
+        for name in self.schedulers:
+            self.schedulers[name].load_state_dict(checkpoint['schedulers'][name])
+
+        self.best_loss = checkpoint.get('best_loss', float('inf'))
+        self.loss_history = checkpoint.get('loss_history', [])
+        self.no_improve_count = checkpoint.get('no_improve_count', 0)
+        self.start_epoch = int(checkpoint['epoch']) + 1
+        self.epoch = int(checkpoint['epoch'])
+
+        print(f"Loaded checkpoint: {checkpoint_path}")
+        print(f"Resuming from epoch: {self.start_epoch}")
+        print(f"Best loss so far: {self.best_loss:.6f}")
+
+    def _save_loss_history(self):
+        """Save loss_history.csv and loss_curves.png to output directory."""
+        if not self.loss_history:
+            return
+
+        # --- CSV ---
+        csv_path = self.output_dir / "loss_history.csv"
+        keys = list(self.loss_history[0].keys())
+        with open(csv_path, "w", newline="") as f:
+            writer = csv_mod.DictWriter(f, fieldnames=keys)
+            writer.writeheader()
+            writer.writerows(self.loss_history)
+
+        # --- PNG ---
+        epochs = [r["epoch"] for r in self.loss_history]
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
+
+        # Total loss
+        axes[0, 0].semilogy(epochs, [r["total"] for r in self.loss_history])
+        axes[0, 0].set_title("Total Loss")
+        axes[0, 0].set_xlabel("Epoch")
+        axes[0, 0].set_ylabel("Loss")
+        axes[0, 0].grid(True, alpha=0.3)
+
+        # Component losses
+        for key, lbl in [("wss", "WSS"), ("physics", "Physics"),
+                          ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure")]:
+            axes[0, 1].semilogy(epochs, [r[key] for r in self.loss_history], label=lbl)
+        axes[0, 1].set_title("Component Losses")
+        axes[0, 1].set_xlabel("Epoch")
+        axes[0, 1].set_ylabel("Loss")
+        axes[0, 1].legend()
+        axes[0, 1].grid(True, alpha=0.3)
+
+        # Physics residuals
+        for key, lbl in [("res_mom_x", "Mom-X"), ("res_mom_y", "Mom-Y"),
+                          ("res_mom_z", "Mom-Z"), ("res_cont", "Continuity")]:
+            axes[1, 0].semilogy(epochs, [r[key] for r in self.loss_history], label=lbl)
+        axes[1, 0].set_title("Physics Residuals")
+        axes[1, 0].set_xlabel("Epoch")
+        axes[1, 0].set_ylabel("Residual")
+        axes[1, 0].legend()
+        axes[1, 0].grid(True, alpha=0.3)
+
+        # Learning rate
+        axes[1, 1].semilogy(epochs, [r["lr"] for r in self.loss_history])
+        axes[1, 1].set_title("Learning Rate")
+        axes[1, 1].set_xlabel("Epoch")
+        axes[1, 1].set_ylabel("LR")
+        axes[1, 1].grid(True, alpha=0.3)
+
+        fig.suptitle(f"{self.config['experiment']['name']} — Training Curves", fontsize=14)
+        fig.savefig(self.output_dir / "loss_curves.png", dpi=200)
+        plt.close(fig)
+        print(f"Loss history saved: {csv_path}")
+        print(f"Loss curves saved:  {self.output_dir / 'loss_curves.png'}")
+
+    def train(self):
+        """Main training loop."""
+        print("\n" + "=" * 70)
+        print("STARTING TRAINING")
+        print("=" * 70)
+
+        total_epochs = self.config['training']['epochs']
+        eval_interval = self.config['training']['validate_interval']
+        save_interval = self.config['training']['save_interval']
+        print(f"Total epochs: {total_epochs}")
+        print(f"Evaluate interval: {eval_interval}")
+        print(f"Save interval: {save_interval}")
+
+        start_time = time.time()
+
+        pbar = tqdm(range(self.start_epoch, total_epochs + 1), desc="Training", unit="epoch",
+                    dynamic_ncols=True)
+
+        for epoch in pbar:
+            self.epoch = epoch
+
+            # Train one epoch
+            avg_loss = self.train_epoch()
+
+            # Update learning rate schedulers
+            for scheduler in self.schedulers.values():
+                scheduler.step()
+
+            lr = self.optimizers['u'].param_groups[0]['lr']
+
+            # Record loss history every epoch
+            # Average loss_dict across phases for this epoch
+            phase_dicts = []
+            for phase in self.config['data']['phases']:
+                _, ld, _ = self.compute_total_loss(phase)
+                phase_dicts.append(ld)
+            avg_dict = {k: np.mean([d[k] for d in phase_dicts])
+                        for k in phase_dicts[0]}
+            self.loss_history.append({
+                "epoch": epoch,
+                "total": avg_dict["total"],
+                "wss": avg_dict["wss"],
+                "physics": avg_dict["physics"],
+                "bc_noslip": avg_dict["bc_noslip"],
+                "pressure": avg_dict["pressure"],
+                "res_mom_x": avg_dict["residual_momentum_x"],
+                "res_mom_y": avg_dict["residual_momentum_y"],
+                "res_mom_z": avg_dict["residual_momentum_z"],
+                "res_cont": avg_dict["residual_continuity"],
+                "lr": lr,
+            })
+
+            # Update tqdm bar
+            pbar.set_postfix(loss=f"{avg_loss:.4e}", lr=f"{lr:.1e}")
+
+            # Detailed evaluation
+            if epoch % eval_interval == 0:
+                self.evaluate()
+
+            # Save checkpoint
+            if epoch % save_interval == 0:
+                self.save_checkpoint(f'checkpoint_epoch_{epoch}.pt')
+
+                if avg_loss < self.best_loss:
+                    self.best_loss = avg_loss
+                    self.save_checkpoint('best_model.pt')
+
+            # Early stopping / best-loss tracking
+            improved = avg_loss < (self.best_loss - self.early_stopping_min_delta)
+            if improved:
+                self.best_loss = avg_loss
+                self.no_improve_count = 0
+            else:
+                self.no_improve_count += 1
+
+            if (
+                self.early_stopping_enabled
+                and epoch >= self.early_stopping_warmup_epochs
+                and self.no_improve_count >= self.early_stopping_patience
+            ):
+                print("\nEarly stopping triggered.")
+                print(f"No improvement for {self.no_improve_count} epochs ")
+                print(f"(patience={self.early_stopping_patience}, min_delta={self.early_stopping_min_delta}).")
+                break
+
+        # Final evaluation
+        print("\n" + "=" * 70)
+        print("TRAINING COMPLETE")
+        print("=" * 70)
+        self.evaluate()
+
+        # Save final model and loss curves
+        self.save_checkpoint('final_model.pt')
+        self._save_loss_history()
+
+        total_time = time.time() - start_time
+        print(f"\nTotal training time: {total_time/3600:.2f} hours")
+        print(f"Best loss: {self.best_loss:.6f}")
+
+
+def main():
+    """Main function."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Train TAA-PINN for single geometry')
+    parser.add_argument('--config', type=str, required=True,
+                       help='Path to configuration YAML file')
+    parser.add_argument('--resume', type=str, default=None,
+                        help='Path to checkpoint to resume from')
+
+    args = parser.parse_args()
+
+    # Create trainer and run training
+    trainer = TAATrainer(args.config, resume_checkpoint=args.resume)
+    trainer.train()
+
+
+if __name__ == "__main__":
+    main()

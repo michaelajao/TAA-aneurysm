@@ -1,0 +1,76 @@
+data:
+  geometry: PD5
+  phases:
+  - systolic
+  - diastolic
+  data_dir: data/
+  files:
+    systolic: 5cm ASU systolic.csv
+    diastolic: 5cm ASU Diastolic.csv
+  subsample_factor: 10
+  normalization:
+    length_scale: 0.05
+    velocity_scale: 1.0
+    pressure_scale: 100.0
+    wss_scale: 1.0
+model:
+  architecture: fourier_residual
+  input_dim: 4
+  hidden_dim: 256
+  num_layers: 10
+  use_fourier: true
+  num_frequencies: 32
+  fourier_scale: 10.0
+  device: cuda
+training:
+  batch_size: 512
+  wall_batch_size: 1000
+  epochs: 10000
+  learning_rate: 0.0001
+  scheduler:
+    type: StepLR
+    step_size: 1000
+    gamma: 0.5
+  gradient_clip: 1.0
+  use_amp: true
+  log_interval: 100
+  save_interval: 1000
+  validate_interval: 500
+  early_stopping:
+    enabled: true
+    patience: 1500
+    min_delta: 1.0e-6
+    warmup_epochs: 2000
+  output_dir: experiments/PD5_baseline/
+loss_weights:
+  lambda_physics: 1.0
+  lambda_BC_noslip: 20.0
+  lambda_WSS: 50.0
+  lambda_pressure: 10.0
+  lambda_continuity: 5.0
+physics:
+  mu: 0.00125
+  rho: 1.0
+  n_interior_points: 1000
+  interior_batch_size: 500
+  interior_offset_range:
+  - 0.05
+  - 0.5
+geometry:
+  normal_estimation:
+    radius: 0.01
+    max_nn: 30
+    orient_inward: true
+random_seed: 42
+validation:
+  compute_wss_metrics: true
+  compute_physics_residuals: true
+  export_vtk: true
+  vtk_interval: 1000
+experiment:
+  name: PD5_baseline
+  description: Baseline training for PD5 geometry (5cm posterior-dominant)
+  tags:
+  - PD5
+  - baseline
+  - single-geometry

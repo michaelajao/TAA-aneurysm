@@ -1,0 +1,121 @@
+# Configuration for AS5 Geometry (5cm Axisymmetric TAA)
+# TAA-PINN Training Configuration
+
+# Data configuration
+data:
+  geometry: "AS5"
+  phases: ["systolic", "diastolic"]
+  data_dir: "data/"
+
+  # File names
+  files:
+    systolic: "5cm systolic.csv"
+    diastolic: "5cm diastolic.csv"
+
+  # Subsampling (1 = no subsampling, 10 = every 10th point)
+  subsample_factor: 10  # Increased to reduce memory usage
+
+  # Normalization scales
+  normalization:
+    length_scale: 0.05  # 5cm characteristic length
+    velocity_scale: 1.0  # m/s
+    pressure_scale: 100.0  # Pa
+    wss_scale: 1.0  # Pa
+
+# Model architecture
+model:
+  architecture: "fourier_residual"  # Options: "fourier_residual", "basic"
+
+  # Network dimensions
+  input_dim: 4  # x, y, z, t_phase
+  hidden_dim: 256  # Number of neurons per layer
+  num_layers: 10  # Number of residual blocks
+
+  # Fourier features
+  use_fourier: true
+  num_frequencies: 32
+  fourier_scale: 10.0
+
+  # Device
+  device: "cuda"  # Options: "cuda", "cpu"
+
+# Training configuration
+training:
+  # Batch size and epochs
+  batch_size: 512  # Batch size for wall points in loss computation
+  wall_batch_size: 1000  # Number of wall points to process at once for WSS loss
+  epochs: 10000
+
+  # Learning rate and scheduling
+  learning_rate: 1.0e-4
+  scheduler:
+    type: "StepLR"  # Options: "StepLR", "ExponentialLR", "ReduceLROnPlateau"
+    step_size: 1000  # For StepLR
+    gamma: 0.5  # Decay factor
+
+  # Gradient clipping
+  gradient_clip: 1.0
+
+  # Mixed precision training
+  use_amp: true  # Automatic Mixed Precision for faster training
+
+  # Logging and checkpointing
+  log_interval: 100  # Log every N epochs
+  save_interval: 1000  # Save checkpoint every N epochs
+  validate_interval: 500  # Run validation every N epochs
+
+  # Early stopping
+  early_stopping:
+    enabled: true
+    patience: 1500
+    min_delta: 1.0e-6
+    warmup_epochs: 2000
+
+  # Output directory
+  output_dir: "experiments/AS5_baseline/"
+
+# Loss function weights
+loss_weights:
+  lambda_physics: 1.0  # Navier-Stokes equations
+  lambda_BC_noslip: 20.0  # No-slip boundary condition at wall
+  lambda_WSS: 50.0  # Wall shear stress matching (CRITICAL - main constraint)
+  lambda_pressure: 10.0  # Pressure matching at wall
+  lambda_continuity: 5.0  # Divergence-free constraint
+
+# Physics parameters
+physics:
+  # Fluid properties (blood)
+  mu: 0.00125  # Dynamic viscosity [Pa·s] or kinematic viscosity [m²/s]
+  rho: 1.0  # Density (normalized)
+
+  # Interior collocation points for physics loss
+  n_interior_points: 1000  # Number of interior points to sample
+  interior_batch_size: 500  # Batch size for physics loss computation
+  interior_offset_range: [0.05, 0.5]  # Offset from wall (in normalized coordinates)
+
+# Geometry utilities
+geometry:
+  # Normal vector computation
+  normal_estimation:
+    radius: 0.01  # Search radius for normal estimation
+    max_nn: 30  # Maximum nearest neighbors
+    orient_inward: true  # Orient normals toward fluid domain
+
+# Random seed for reproducibility
+random_seed: 42
+
+# Validation
+validation:
+  # Metrics to compute
+  compute_wss_metrics: true
+  compute_physics_residuals: true
+
+  # Visualization
+  export_vtk: true  # Export predictions to VTK for ParaView
+  vtk_interval: 1000  # Export every N epochs
+
+# Experiment tracking
+experiment:
+  name: "AS5_baseline"
+  description: "Baseline training for AS5 geometry with standard hyperparameters"
+  tags: ["AS5", "baseline", "single-geometry"]
