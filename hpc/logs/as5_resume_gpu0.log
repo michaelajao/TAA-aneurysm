@@ -1,0 +1,63 @@
+nohup: ignoring input
+/home/olarinoyem/miniconda3/envs/deep_tf/lib/python3.11/site-packages/requests/__init__.py:86: RequestsDependencyWarning: Unable to find acceptable character detection dependency (chardet or charset_normalizer).
+  warnings.warn(
+======================================================================
+TAA-PINN TRAINING
+======================================================================
+
+Experiment: AS5_baseline
+Description: Baseline training for AS5 geometry with standard hyperparameters
+Geometry: AS5
+Device: cuda
+Output directory: experiments/AS5_baseline
+
+----------------------------------------------------------------------
+LOADING DATA
+----------------------------------------------------------------------
+
+Loading systolic: 5cm systolic.csv
+Computing wall normals...
+Sampling interior collocation points...
+  Wall points: 7085
+  Interior points: 1000
+  Normals computed: torch.Size([7085, 3])
+  Phase encoding: 1.0
+
+Loading diastolic: 5cm diastolic.csv
+Computing wall normals...
+Sampling interior collocation points...
+  Wall points: 7085
+  Interior points: 1000
+  Normals computed: torch.Size([7085, 3])
+  Phase encoding: 0.0
+
+Data loading complete!
+
+----------------------------------------------------------------------
+INITIALIZING NETWORKS
+----------------------------------------------------------------------
+  Net_u: 1,332,737 parameters
+  Net_v: 1,332,737 parameters
+  Net_w: 1,332,737 parameters
+  Net_p: 1,332,737 parameters
+  Total: 5,330,948 parameters
+
+----------------------------------------------------------------------
+INITIALIZING OPTIMIZERS
+----------------------------------------------------------------------
+Learning rate: 0.0001
+Optimizer: Adam (β=(0.9, 0.99), ε=1e-15)
+Scheduler: StepLR
+Loaded checkpoint: experiments/AS5_baseline/checkpoint_epoch_1000.pt
+Resuming from epoch: 1001
+Best loss so far: 445.984982
+
+Initialization complete!
+
+======================================================================
+STARTING TRAINING
+======================================================================
+Total epochs: 10000
+Evaluate interval: 500
+Save interval: 1000
+Training:   0%|          | 0/9000 [00:00<?, ?epoch/s]Training:   0%|          | 0/9000 [00:07<?, ?epoch/s, loss=4.4563e+02, lr=5.0e-05]Training:   0%|          | 1/9000 [00:07<17:44:07,  7.09s/epoch, loss=4.4563e+02, lr=5.0e-05]Training:   0%|          | 1/9000 [00:11<17:44:07,  7.09s/epoch, loss=4.4525e+02, lr=5.0e-05]Training:   0%|          | 2/9000 [00:11<13:55:32,  5.57s/epoch, loss=4.4525e+02, lr=5.0e-05]Training:   0%|          | 2/9000 [00:15<13:55:32,  5.57s/epoch, loss=4.4520e+02, lr=5.0e-05]Training:   0%|          | 3/9000 [00:15<11:37:42,  4.65s/epoch, loss=4.4520e+02, lr=5.0e-05]Training:   0%|          | 3/9000 [00:18<11:37:42,  4.65s/epoch, loss=4.4505e+02, lr=5.0e-05]Training:   0%|          | 4/9000 [00:18<10:31:50,  4.21s/epoch, loss=4.4505e+02, lr=5.0e-05]Training:   0%|          | 4/9000 [00:22<10:31:50,  4.21s/epoch, loss=4.4492e+02, lr=5.0e-05]Training:   0%|          | 5/9000 [00:22<9:57:07,  3.98s/epoch, loss=4.4492e+02, lr=5.0e-05] Training:   0%|          | 5/9000 [00:25<9:57:07,  3.98s/epoch, loss=4.4477e+02, lr=5.0e-05]Training:   0%|          | 6/9000 [00:25<9:33:41,  3.83s/epoch, loss=4.4477e+02, lr=5.0e-05]Training:   0%|          | 6/9000 [00:29<9:33:41,  3.83s/epoch, loss=4.4471e+02, lr=5.0e-05]Training:   0%|          | 7/9000 [00:29<9:21:14,  3.74s/epoch, loss=4.4471e+02, lr=5.0e-05]Training:   0%|          | 7/9000 [00:32<9:21:14,  3.74s/epoch, loss=4.4448e+02, lr=5.0e-05]Training:   0%|          | 8/9000 [00:32<9:10:28,  3.67s/epoch, loss=4.4448e+02, lr=5.0e-05]Training:   0%|          | 8/9000 [00:36<9:10:28,  3.67s/epoch, loss=4.4434e+02, lr=5.0e-05]Training:   0%|          | 9/9000 [00:36<9:14:54,  3.70s/epoch, loss=4.4434e+02, lr=5.0e-05]Training:   0%|          | 9/9000 [00:41<9:14:54,  3.70s/epoch, loss=4.4414e+02, lr=5.0e-05]Training:   0%|          | 10/9000 [00:41<9:56:27,  3.98s/epoch, loss=4.4414e+02, lr=5.0e-05]Training:   0%|          | 10/9000 [00:44<9:56:27,  3.98s/epoch, loss=4.4398e+02, lr=5.0e-05]Training:   0%|          | 11/9000 [00:44<9:38:45,  3.86s/epoch, loss=4.4398e+02, lr=5.0e-05]Training:   0%|          | 11/9000 [00:48<9:38:45,  3.86s/epoch, loss=4.4377e+02, lr=5.0e-05]Training:   0%|          | 12/9000 [00:48<9:23:00,  3.76s/epoch, loss=4.4377e+02, lr=5.0e-05]Training:   0%|          | 12/9000 [00:51<9:23:00,  3.76s/epoch, loss=4.4362e+02, lr=5.0e-05]Training:   0%|          | 13/9000 [00:51<9:13:00,  3.69s/epoch, loss=4.4362e+02, lr=5.0e-05]Training:   0%|          | 13/9000 [00:55<9:13:00,  3.69s/epoch, loss=4.4343e+02, lr=5.0e-05]Training:   0%|          | 14/9000 [00:55<9:04:23,  3.63s/epoch, loss=4.4343e+02, lr=5.0e-05]Training:   0%|          | 14/9000 [00:58<9:04:23,  3.63s/epoch, loss=4.4326e+02, lr=5.0e-05]Training:   0%|          | 15/9000 [00:58<8:58:17,  3.59s/epoch, loss=4.4326e+02, lr=5.0e-05]Training:   0%|          | 15/9000 [01:02<8:58:17,  3.59s/epoch, loss=4.4313e+02, lr=5.0e-05]Training:   0%|          | 16/9000 [01:02<8:55:14,  3.57s/epoch, loss=4.4313e+02, lr=5.0e-05]Training:   0%|          | 16/9000 [01:05<8:55:14,  3.57s/epoch, loss=4.4294e+02, lr=5.0e-05]Training:   0%|          | 17/9000 [01:05<8:52:36,  3.56s/epoch, loss=4.4294e+02, lr=5.0e-05]Training:   0%|          | 17/9000 [01:09<8:52:36,  3.56s/epoch, loss=4.4281e+02, lr=5.0e-05]Training:   0%|          | 18/9000 [01:09<8:50:11,  3.54s/epoch, loss=4.4281e+02, lr=5.0e-05]Training:   0%|          | 18/9000 [01:13<8:50:11,  3.54s/epoch, loss=4.4263e+02, lr=5.0e-05]Training:   0%|          | 19/9000 [01:13<8:50:19,  3.54s/epoch, loss=4.4263e+02, lr=5.0e-05]Training:   0%|          | 19/9000 [01:16<8:50:19,  3.54s/epoch, loss=4.4253e+02, lr=5.0e-05]Training:   0%|          | 20/9000 [01:16<8:50:08,  3.54s/epoch, loss=4.4253e+02, lr=5.0e-05]Training:   0%|          | 20/9000 [01:20<8:50:08,  3.54s/epoch, loss=4.4241e+02, lr=5.0e-05]Training:   0%|          | 21/9000 [01:20<8:49:39,  3.54s/epoch, loss=4.4241e+02, lr=5.0e-05]Training:   0%|          | 21/9000 [01:23<8:49:39,  3.54s/epoch, loss=4.4232e+02, lr=5.0e-05]Training:   0%|          | 22/9000 [01:23<8:49:52,  3.54s/epoch, loss=4.4232e+02, lr=5.0e-05]Training:   0%|          | 22/9000 [01:27<8:49:52,  3.54s/epoch, loss=4.4218e+02, lr=5.0e-05]Training:   0%|          | 23/9000 [01:27<8:48:54,  3.54s/epoch, loss=4.4218e+02, lr=5.0e-05]Training:   0%|          | 23/9000 [01:30<8:48:54,  3.54s/epoch, loss=4.4209e+02, lr=5.0e-05]Training:   0%|          | 24/9000 [01:30<8:47:08,  3.52s/epoch, loss=4.4209e+02, lr=5.0e-05]Training:   0%|          | 24/9000 [01:34<8:47:08,  3.52s/epoch, loss=4.4198e+02, lr=5.0e-05]Training:   0%|          | 25/9000 [01:34<8:45:41,  3.51s/epoch, loss=4.4198e+02, lr=5.0e-05]Training:   0%|          | 25/9000 [01:37<8:45:41,  3.51s/epoch, loss=4.4189e+02, lr=5.0e-05]Training:   0%|          | 26/9000 [01:37<8:43:06,  3.50s/epoch, loss=4.4189e+02, lr=5.0e-05]Training:   0%|          | 26/9000 [01:41<8:43:06,  3.50s/epoch, loss=4.4178e+02, lr=5.0e-05]Training:   0%|          | 27/9000 [01:41<8:39:53,  3.48s/epoch, loss=4.4178e+02, lr=5.0e-05]Training:   0%|          | 27/9000 [01:44<8:39:53,  3.48s/epoch, loss=4.4167e+02, lr=5.0e-05]Training:   0%|          | 28/9000 [01:44<8:38:49,  3.47s/epoch, loss=4.4167e+02, lr=5.0e-05]Training:   0%|          | 28/9000 [01:47<8:38:49,  3.47s/epoch, loss=4.4155e+02, lr=5.0e-05]Training:   0%|          | 29/9000 [01:47<8:38:28,  3.47s/epoch, loss=4.4155e+02, lr=5.0e-05]Training:   0%|          | 29/9000 [01:51<8:38:28,  3.47s/epoch, loss=4.4141e+02, lr=5.0e-05]Training:   0%|          | 30/9000 [01:51<8:41:18,  3.49s/epoch, loss=4.4141e+02, lr=5.0e-05]Training:   0%|          | 30/9000 [01:55<8:41:18,  3.49s/epoch, loss=4.4129e+02, lr=5.0e-05]Training:   0%|          | 31/9000 [01:55<8:42:45,  3.50s/epoch, loss=4.4129e+02, lr=5.0e-05]Training:   0%|          | 31/9000 [01:58<8:42:45,  3.50s/epoch, loss=4.4118e+02, lr=5.0e-05]Training:   0%|          | 32/9000 [01:58<8:41:24,  3.49s/epoch, loss=4.4118e+02, lr=5.0e-05]

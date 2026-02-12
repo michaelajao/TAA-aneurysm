@@ -1,0 +1,9 @@
+nohup: ignoring input
+============================================================
+TAA non-Slurm sequential run started: Thu 12 Feb 22:37:14 UTC 2026
+Conda env: deep_tf
+Geometries: AD5 PD5 AS6 AD6 PD6
+Host: brosnan.coventry.ac.uk
+============================================================
+[Thu 12 Feb 22:37:14 UTC 2026] Starting AD5
+[Thu 12 Feb 22:37:14 UTC 2026] Command: python training/train_single_geometry.py --config configs/AD5_config.yaml

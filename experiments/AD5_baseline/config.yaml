@@ -1,9 +1,9 @@
 data:
   data_dir: data/
   files:
-    diastolic: 5cm diastolic.csv
-    systolic: 5cm systolic.csv
-  geometry: AS5
+    diastolic: 5cm ASD Diastolic.csv
+    systolic: 5cm ASD systolic.csv
+  geometry: AD5
   normalization:
     length_scale: 0.05
     pressure_scale: 100.0
@@ -14,10 +14,10 @@ data:
   - diastolic
   subsample_factor: 10
 experiment:
-  description: Baseline training for AS5 geometry with standard hyperparameters
-  name: AS5_baseline
+  description: Baseline training for AD5 geometry (5cm anterior-dominant)
+  name: AD5_baseline
   tags:
-  - AS5
+  - AD5
   - baseline
   - single-geometry
 geometry:
@@ -60,7 +60,7 @@ training:
   gradient_clip: 1.0
   learning_rate: 0.0001
   log_interval: 100
-  output_dir: experiments/AS5_baseline/
+  output_dir: experiments/AD5_baseline/
   save_interval: 1000
   scheduler:
     gamma: 0.5
