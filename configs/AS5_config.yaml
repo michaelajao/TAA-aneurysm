@@ -1,121 +1,92 @@
 # Configuration for AS5 Geometry (5cm Axisymmetric TAA)
-# TAA-PINN Training Configuration
+# V3: physics loss annealing, periodic renorm, collocation resampling, validation split
 
-# Data configuration
 data:
-  geometry: "AS5"
-  phases: ["systolic", "diastolic"]
-  data_dir: "data/"
-
-  # File names
+  geometry: AS5
+  phases:
+  - systolic
+  - diastolic
+  data_dir: data/
   files:
-    systolic: "5cm systolic.csv"
-    diastolic: "5cm diastolic.csv"
-
-  # Subsampling (1 = no subsampling, 10 = every 10th point)
-  subsample_factor: 10  # Increased to reduce memory usage
-
-  # Normalization scales
+    systolic: 5cm systolic.csv
+    diastolic: 5cm diastolic.csv
+  subsample_factor: 10
   normalization:
-    length_scale: 0.05  # 5cm characteristic length
-    velocity_scale: 1.0  # m/s
-    pressure_scale: 100.0  # Pa
-    wss_scale: 1.0  # Pa
+    length_scale: 0.05
+    velocity_scale: 1.0
+    pressure_scale: 100.0
+    wss_scale: 1.0
 
-# Model architecture
 model:
-  architecture: "fourier_residual"  # Options: "fourier_residual", "basic"
-
-  # Network dimensions
-  input_dim: 4  # x, y, z, t_phase
-  hidden_dim: 256  # Number of neurons per layer
-  num_layers: 10  # Number of residual blocks
-
-  # Fourier features
+  architecture: fourier_residual
+  input_dim: 4
+  hidden_dim: 256
+  num_layers: 10
   use_fourier: true
   num_frequencies: 32
   fourier_scale: 10.0
+  device: cuda
 
-  # Device
-  device: "cuda"  # Options: "cuda", "cpu"
-
-# Training configuration
 training:
-  # Batch size and epochs
-  batch_size: 4096  # Batch size for wall points in loss computation
-  wall_batch_size: 8000  # Number of wall points to process at once for WSS loss
-  epochs: 10000
-
-  # Learning rate and scheduling
-  learning_rate: 1.0e-4
+  batch_size: 4096
+  wall_batch_size: 8000
+  epochs: 15000
+  learning_rate: 0.0001
   scheduler:
-    type: "StepLR"  # Options: "StepLR", "ExponentialLR", "ReduceLROnPlateau"
-    step_size: 1000  # For StepLR
-    gamma: 0.5  # Decay factor
-
-  # Gradient clipping
+    type: CosineAnnealingWarmRestarts
+    T_0: 2000
+    T_mult: 2
+    eta_min: 1.0e-7
   gradient_clip: 1.0
-
-  # Mixed precision training
-  use_amp: true  # Automatic Mixed Precision for faster training
-
-  # Logging and checkpointing
-  log_interval: 100  # Log every N epochs
-  save_interval: 1000  # Save checkpoint every N epochs
-  validate_interval: 500  # Run validation every N epochs
-
-  # Early stopping
+  use_amp: false
+  loss_normalization: true
+  renorm_interval: 500
+  log_interval: 100
+  save_interval: 2500
+  validate_interval: 500
+  validation_split: 0.2
   early_stopping:
     enabled: true
     patience: 1500
     min_delta: 1.0e-6
     warmup_epochs: 2000
+  output_dir: experiments/AS5_adaptive_physics/
 
-  # Output directory
-  output_dir: "experiments/AS5_baseline/"
-
-# Loss function weights
 loss_weights:
-  lambda_physics: 1.0  # Navier-Stokes equations
-  lambda_BC_noslip: 20.0  # No-slip boundary condition at wall
-  lambda_WSS: 50.0  # Wall shear stress matching (CRITICAL - main constraint)
-  lambda_pressure: 10.0  # Pressure matching at wall
-  lambda_continuity: 5.0  # Divergence-free constraint
+  lambda_physics: 1.0
+  lambda_BC_noslip: 20.0
+  lambda_WSS: 50.0
+  lambda_pressure: 10.0
+  physics_ramp_epochs: 2000
 
-# Physics parameters
 physics:
-  # Fluid properties (blood)
-  mu: 0.00125  # Dynamic viscosity [Pa·s] or kinematic viscosity [m²/s]
-  rho: 1.0  # Density (normalized)
+  mu: 0.00125
+  rho: 1.0
+  n_interior_points: 2000
+  interior_batch_size: 2000
+  interior_offset_range:
+  - 0.05
+  - 0.5
+  resample_collocation_interval: 1000
 
-  # Interior collocation points for physics loss
-  n_interior_points: 2000  # Number of interior points to sample
-  interior_batch_size: 2000  # Batch size for physics loss computation
-  interior_offset_range: [0.05, 0.5]  # Offset from wall (in normalized coordinates)
-
-# Geometry utilities
 geometry:
-  # Normal vector computation
   normal_estimation:
-    radius: 0.01  # Search radius for normal estimation
-    max_nn: 30  # Maximum nearest neighbors
-    orient_inward: true  # Orient normals toward fluid domain
+    radius: 0.01
+    max_nn: 30
+    orient_inward: true
 
-# Random seed for reproducibility
 random_seed: 42
 
-# Validation
 validation:
-  # Metrics to compute
   compute_wss_metrics: true
   compute_physics_residuals: true
+  export_vtk: true
+  vtk_interval: 2500
 
-  # Visualization
-  export_vtk: true  # Export predictions to VTK for ParaView
-  vtk_interval: 1000  # Export every N epochs
-
-# Experiment tracking
 experiment:
-  name: "AS5_baseline"
-  description: "Baseline training for AS5 geometry with standard hyperparameters"
-  tags: ["AS5", "baseline", "single-geometry"]
+  name: AS5_adaptive_physics
+  description: "Adaptive physics training: annealing, periodic renorm, collocation resampling, validation split"
+  tags:
+  - AS5
+  - adaptive_physics
+  - single-geometry

@@ -2,18 +2,62 @@
 
 ## Overview
 
-This project adapts the PINN-wss methodology to learn hemodynamic patterns in Thoracic Aortic Aneurysms (TAAs) using Computational Fluid Dynamics (CFD) data. The key innovation is using **wall shear stress (WSS) data** to constrain the learning of interior velocity fields, rather than requiring sparse interior velocity measurements.
+This project implements Physics-Informed Neural Networks (PINNs) for hemodynamic analysis of Thoracic Aortic Aneurysms (TAAs) using Computational Fluid Dynamics (CFD) data. The key innovation is using **wall shear stress (WSS) data** to constrain the learning of interior velocity and pressure fields, rather than requiring sparse interior velocity measurements.
+
+**Current Version**: Adaptive Physics Training
+- Physics loss annealing for stable convergence
+- Periodic loss renormalization to prevent component stagnation
+- Dynamic collocation point resampling for better coverage
+- Validation split (20%) for generalization monitoring
+- Consistent coordinate centering regardless of subsampling
+
+## Project Status
+
+✅ **Implemented**:
+- Four-network architecture (u, v, w, p) with Fourier features
+- WSS-constrained training with automatic differentiation
+- Navier-Stokes physics enforcement
+- Adaptive loss balancing and physics annealing
+- Validation metrics and early stopping
+- CFD vs PINN comparison visualization
+
+⚠️ **Known Issues Fixed**:
+- Previous versions had physics loss divergence (λ_physics=0.1 was too low)
+- Coordinate centering now consistent between training and evaluation
+- Loss normalization now updates periodically to track changing magnitudes
+- Best model saves immediately on improvement (not just at checkpoint intervals)
 
 ## Table of Contents
 
-1. [What Gets Trained](#what-gets-trained)
-2. [What Gets Visualized](#what-gets-visualized)
-3. [Methodology](#methodology)
+1. [Quick Start](#quick-start)
+2. [What Gets Trained](#what-gets-trained)
+3. [Training Methodology](#training-methodology)
 4. [Dataset Description](#dataset-description)
 5. [Installation & Usage](#installation--usage)
 6. [Project Structure](#project-structure)
 7. [Results & Validation](#results--validation)
 8. [References](#references)
+
+---
+
+## Quick Start
+
+```bash
+# 1. Install dependencies
+conda activate deep_tf  # or your environment
+
+# 2. Train a single geometry
+python training/train_single_geometry.py --config configs/AD5_config.yaml
+
+# 3. Train all geometries (HPC)
+bash hpc/run_adaptive_physics_training.sh
+
+# 4. Generate comparison plots
+python utils/generate_comparison_plots.py --geom AD5
+
+# 5. Monitor training
+tail -f hpc/logs/gpu1_adaptive_physics_*.log
+```
 
 ---
 
@@ -104,9 +148,89 @@ Output (scalar field)
 - Learn smooth, physically-consistent flow field
 - Match WSS patterns from CFD data
 
-**Training Duration**: 10,000 epochs (~several hours on GPU)
+**Training Duration**: 15,000 epochs (~several hours on GPU)
 
 ---
+
+## Training Methodology
+
+### Adaptive Physics Training Strategy
+
+The current training approach implements several key improvements over standard PINN training to ensure stable convergence and prevent physics loss divergence:
+
+**1. Physics Loss Annealing** (`physics_ramp_epochs: 2000`)
+- **Problem**: Starting with full physics weight causes instability when networks haven't learned basic flow patterns
+- **Solution**: Gradually ramp `λ_physics` from 0 to 1.0 over first 2000 epochs
+- **Benefit**: Networks first learn to match wall data (WSS, pressure, BC), then progressively enforce interior physics
+- **Formula**: `λ_effective = λ_physics × min(1.0, epoch / 2000)`
+
+**2. Periodic Loss Renormalization** (`renorm_interval: 500`)
+- **Problem**: Loss magnitudes change during training; initial normalization becomes stale
+- **Solution**: Re-compute normalization factors every 500 epochs based on current raw loss values
+- **Benefit**: Keeps all loss components contributing equally throughout training
+- **Implementation**: `L_i / norm_i` where `norm_i` is updated periodically
+
+**3. Dynamic Collocation Resampling** (`resample_collocation_interval: 1000`)
+- **Problem**: Fixed interior points means physics is only enforced at same 2000 locations forever
+- **Solution**: Re-sample interior collocation points every 1000 epochs
+- **Benefit**: Better coverage of interior domain, prevents overfitting to specific point locations
+- **Method**: Random offsets from wall points along normals (range: 0.05 to 0.5 in normalized coords)
+
+**4. Validation Split** (`validation_split: 0.2`)
+- **Problem**: No way to detect overfitting; all metrics computed on training data
+- **Solution**: Hold out 20% of wall points for validation
+- **Benefit**: Track generalization, use validation loss for early stopping
+- **Implementation**: Fixed seed split at initialization, metrics computed every `validate_interval` epochs
+
+**5. Consistent Coordinate Centering**
+- **Problem**: Subsampling training data (10×) changes the coordinate mean, causing mismatch at evaluation
+- **Solution**: Always center using full-dataset mean, even when subsampling
+- **Benefit**: PINN sees same coordinate ranges during training and inference
+- **Details**: Data loader computes full mean before subsampling, applies to subsampled data
+
+**6. Immediate Best Model Saving**
+- **Problem**: Previous versions only saved best model at checkpoint intervals (e.g., every 1000 epochs)
+- **Solution**: Save `best_model.pt` immediately whenever validation loss improves
+- **Benefit**: Don't lose the best model if training diverges between checkpoints
+
+### Loss Weight Configuration
+
+```yaml
+loss_weights:
+  lambda_WSS: 50.0              # Wall shear stress (CRITICAL constraint)
+  lambda_physics: 1.0           # Navier-Stokes (restored from 0.1)
+  lambda_BC_noslip: 20.0        # No-slip boundary condition
+  lambda_pressure: 10.0         # Pressure matching
+  physics_ramp_epochs: 2000     # Annealing duration
+
+physics:
+  n_interior_points: 2000       # Collocation points
+  resample_collocation_interval: 1000  # Resampling frequency
+  
+training:
+  renorm_interval: 500          # Loss renormalization frequency
+  validation_split: 0.2         # Fraction held out for validation
+  epochs: 15000                 # Total training epochs
+  save_interval: 2500           # Checkpoint frequency
+```
+
+### Expected Training Behavior
+
+**Healthy Training Signs**:
+- Total loss decreases smoothly over first 5000 epochs
+- Physics loss stays bounded (< 10.0 raw value by end of training)
+- WSS loss < 0.1 by convergence
+- Validation loss tracks training loss (no large gap)
+- Correlation > 0.95 on validation set
+
+**Warning Signs**:
+- Physics loss diverging (> 1000) - indicates weights too low or annealing too fast
+- Large gap between train/val loss - overfitting
+- WSS loss > 1.0 after 10K epochs - geometry may need more capacity or different hyperparameters
+
+---
+
+## Dataset Description
 
 ## What Gets Visualized
 

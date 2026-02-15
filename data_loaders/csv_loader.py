@@ -65,6 +65,9 @@ class TAADataLoader:
         """
         Load a single CSV file and extract relevant data.
 
+        Coordinate centering uses the FULL dataset mean (before subsampling)
+        so that the centering is consistent regardless of subsample_factor.
+
         Args:
             filename: Name of CSV file (e.g., '5cm diastolic.csv')
             subsample_factor: Sample every Nth point (1 = all points)
@@ -77,6 +80,7 @@ class TAADataLoader:
                 - wss_components: (N, 3) array of WSS x, y, z components
                 - phase: Scalar (0.0 for diastolic, 1.0 for systolic)
                 - geometry: String geometry code
+                - coords_mean: (3,) the centering mean (from full data)
         """
         filepath = os.path.join(self.data_dir, filename)
 
@@ -111,7 +115,14 @@ class TAADataLoader:
         # Drop rows with any NaN values (these are likely header rows or empty rows)
         df = df.dropna().reset_index(drop=True)
 
-        # Subsample dataframe if requested
+        # Compute centering mean from FULL dataset BEFORE subsampling
+        x_full = df['X [ m ]'].values.astype(float)
+        y_full = df['Y [ m ]'].values.astype(float)
+        z_full = df['Z [ m ]'].values.astype(float)
+        coords_full = np.column_stack([x_full, y_full, z_full])
+        coords_mean = coords_full.mean(axis=0)
+
+        # Subsample dataframe if requested (AFTER computing the full mean)
         if subsample_factor > 1:
             df = df.iloc[::subsample_factor].reset_index(drop=True)
 
@@ -121,8 +132,8 @@ class TAADataLoader:
         z = df['Z [ m ]'].values.astype(float)
         coords = np.column_stack([x, y, z])
 
-        # Center coordinates at origin
-        coords_centered = coords - coords.mean(axis=0)
+        # Center coordinates using full-dataset mean (consistent across subsample factors)
+        coords_centered = coords - coords_mean
 
         # Normalize by geometry scale
         coords_normalized = coords_centered / self.geometry_scale
@@ -152,6 +163,7 @@ class TAADataLoader:
         return {
             'coords': coords_normalized,
             'coords_raw': coords,  # Keep raw for visualization
+            'coords_mean': coords_mean,  # Full-data centering mean
             'pressure': pressure_normalized,
             'pressure_raw': pressure,
             'wss_magnitude': wss_magnitude_normalized,

@@ -1,3 +1,6 @@
+# Configuration for PD6 Geometry (6cm Posterior-Dominant TAA)
+# V3: physics loss annealing, periodic renorm, collocation resampling, validation split
+
 data:
   geometry: PD6
   phases:
@@ -13,6 +16,7 @@ data:
     velocity_scale: 1.0
     pressure_scale: 100.0
     wss_scale: 1.0
+
 model:
   architecture: fourier_residual
   input_dim: 4
@@ -22,32 +26,39 @@ model:
   num_frequencies: 32
   fourier_scale: 10.0
   device: cuda
+
 training:
   batch_size: 4096
   wall_batch_size: 8000
-  epochs: 10000
+  epochs: 15000
   learning_rate: 0.0001
   scheduler:
-    type: StepLR
-    step_size: 1000
-    gamma: 0.5
+    type: CosineAnnealingWarmRestarts
+    T_0: 2000
+    T_mult: 2
+    eta_min: 1.0e-7
   gradient_clip: 1.0
-  use_amp: true
+  use_amp: false
+  loss_normalization: true
+  renorm_interval: 500
   log_interval: 100
-  save_interval: 1000
+  save_interval: 2500
   validate_interval: 500
+  validation_split: 0.2
   early_stopping:
     enabled: true
     patience: 1500
     min_delta: 1.0e-6
     warmup_epochs: 2000
-  output_dir: experiments/PD6_baseline/
+  output_dir: experiments/PD6_adaptive_physics/
+
 loss_weights:
   lambda_physics: 1.0
   lambda_BC_noslip: 20.0
   lambda_WSS: 50.0
   lambda_pressure: 10.0
-  lambda_continuity: 5.0
+  physics_ramp_epochs: 2000
+
 physics:
   mu: 0.00125
   rho: 1.0
@@ -56,21 +67,26 @@ physics:
   interior_offset_range:
   - 0.05
   - 0.5
+  resample_collocation_interval: 1000
+
 geometry:
   normal_estimation:
     radius: 0.01
     max_nn: 30
     orient_inward: true
+
 random_seed: 42
+
 validation:
   compute_wss_metrics: true
   compute_physics_residuals: true
   export_vtk: true
-  vtk_interval: 1000
+  vtk_interval: 2500
+
 experiment:
-  name: PD6_baseline
-  description: Baseline training for PD6 geometry (6cm posterior-dominant)
+  name: PD6_adaptive_physics
+  description: "Adaptive physics training: annealing, periodic renorm, collocation resampling, validation split"
   tags:
   - PD6
-  - baseline
+  - adaptive_physics
   - single-geometry
