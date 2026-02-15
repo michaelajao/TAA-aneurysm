@@ -79,11 +79,6 @@ class TAATrainer:
         with open(config_save_path, 'w') as f:
             yaml.dump(self.config, f)
 
-        # Initialize components
-        self._load_data()
-        self._initialize_networks()
-        self._initialize_optimizers()
-
         # Training state
         self.epoch = 0
         self.best_loss = float('inf')
@@ -113,6 +108,11 @@ class TAATrainer:
         self.early_stopping_min_delta = float(early_cfg.get('min_delta', 0.0))
         self.early_stopping_warmup_epochs = int(early_cfg.get('warmup_epochs', 0))
         self.no_improve_count = 0
+
+        # Initialize components (after all config attributes are set)
+        self._load_data()
+        self._initialize_networks()
+        self._initialize_optimizers()
 
         # Optional resume
         if resume_checkpoint:
