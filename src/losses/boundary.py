@@ -72,17 +72,18 @@ def compute_pressure_loss(net_p,
 
 def compute_velocity_magnitude_constraint(net_u, net_v, net_w,
                                           x, y, z, t_phase,
-                                          max_velocity=2.0):
+                                          max_velocity=3.0):
     """
-    Optional: Constrain velocity magnitude to physically reasonable values.
+    Optional: Constrain non-dimensional velocity magnitude to reasonable values.
 
-    This can help with training stability.
+    This can help with training stability.  max_velocity is in non-dimensional
+    units (multiples of U_ref), so 3.0 means 3x the characteristic velocity.
 
     Args:
-        net_u, net_v, net_w: Neural networks
-        x, y, z: Coordinates (N, 1)
+        net_u, net_v, net_w: Neural networks for non-dim velocity
+        x, y, z: Non-dimensional coordinates (N, 1)
         t_phase: Cardiac phase (N, 1)
-        max_velocity: Maximum allowed velocity magnitude
+        max_velocity: Maximum allowed non-dim velocity magnitude
 
     Returns:
         loss: Penalty for velocities exceeding max_velocity

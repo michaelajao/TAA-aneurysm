@@ -8,12 +8,8 @@ with Fourier feature encoding and residual blocks.
 import torch
 import torch.nn as nn
 
-try:
-    from .fourier_features import FourierFeatures
-    from .residual_blocks import ResidualBlock, Swish
-except ImportError:
-    from fourier_features import FourierFeatures
-    from residual_blocks import ResidualBlock, Swish
+from .fourier import FourierFeatures
+from .blocks import ResidualBlock, Swish
 
 
 class TAANet(nn.Module):

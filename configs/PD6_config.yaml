@@ -1,5 +1,5 @@
 # Configuration for PD6 Geometry (6cm Posterior-Dominant TAA)
-# V3: physics loss annealing, periodic renorm, collocation resampling, validation split
+# V4: full non-dimensionalization with Re-based physics formulation
 
 data:
   geometry: PD6
@@ -12,15 +12,13 @@ data:
     diastolic: 6cm ASU Diastolic.csv
   subsample_factor: 10
   normalization:
-    length_scale: 0.06
-    velocity_scale: 1.0
-    pressure_scale: 100.0
-    wss_scale: 1.0
+    length_scale: 0.05  # L_ref (m) -- vessel diameter
+    # U_ref, P_ref, tau_ref, Re are auto-computed from data and fluid properties
 
 model:
   architecture: fourier_residual
   input_dim: 4
-  hidden_dim: 256
+  hidden_dim: 128
   num_layers: 10
   use_fourier: true
   num_frequencies: 32
@@ -29,27 +27,24 @@ model:
 
 training:
   batch_size: 4096
-  wall_batch_size: 8000
-  epochs: 15000
+  wall_batch_size: 16000
+  epochs: 10000
   learning_rate: 0.0001
   scheduler:
-    type: CosineAnnealingWarmRestarts
-    T_0: 2000
-    T_mult: 2
-    eta_min: 1.0e-7
+    type: StepLR
+    step_size: 2000       # decay LR every 2000 epochs
+    gamma: 0.5            # halve LR at each step
   gradient_clip: 1.0
   use_amp: false
   loss_normalization: true
-  renorm_interval: 500
+  renorm_interval: 0          # fixed from epoch 1 (no re-scaling)
   log_interval: 100
   save_interval: 2500
-  validate_interval: 500
-  validation_split: 0.2
+  eval_interval: 500
   early_stopping:
     enabled: true
-    patience: 1500
+    patience: 2000        # epochs without improvement
     min_delta: 1.0e-6
-    warmup_epochs: 2000
   output_dir: experiments/PD6_adaptive_physics/
 
 loss_weights:
@@ -57,13 +52,13 @@ loss_weights:
   lambda_BC_noslip: 20.0
   lambda_WSS: 50.0
   lambda_pressure: 10.0
-  physics_ramp_epochs: 2000
+  physics_ramp_epochs: 0        # physics active from epoch 1 (normalization handles balance)
 
 physics:
-  mu: 0.00125
-  rho: 1.0
-  n_interior_points: 2000
-  interior_batch_size: 2000
+  mu: 0.0035            # Pa.s (Carreau-Yasuda mu_inf -- Newtonian approximation)
+  rho: 1060.0           # kg/m^3 (blood density)
+  n_interior_points: 4000
+  interior_batch_size: 4000
   interior_offset_range:
   - 0.05
   - 0.5
@@ -77,7 +72,7 @@ geometry:
 
 random_seed: 42
 
-validation:
+evaluation:
   compute_wss_metrics: true
   compute_physics_residuals: true
   export_vtk: true
@@ -85,7 +80,7 @@ validation:
 
 experiment:
   name: PD6_adaptive_physics
-  description: "Adaptive physics training: annealing, periodic renorm, collocation resampling, validation split"
+  description: "Non-dimensional formulation: Re-based physics, auto-computed reference scales, blood properties"
   tags:
   - PD6
   - adaptive_physics

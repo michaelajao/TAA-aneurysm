@@ -1,0 +1,11 @@
+# TAA-PINN dependencies
+# Install: pip install -r requirements.txt
+
+torch>=2.0
+numpy>=1.24
+pandas>=2.0
+matplotlib>=3.7
+pyyaml>=6.0
+tqdm>=4.65
+open3d>=0.17
+scipy>=1.10

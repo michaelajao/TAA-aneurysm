@@ -11,7 +11,6 @@ Integrates all components:
 
 import csv as csv_mod
 import os
-import sys
 import yaml
 import time
 import torch
@@ -24,16 +23,13 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from tqdm import tqdm
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# Import custom modules
-from data_loaders.csv_loader import TAADataLoader
-from utils.geometry_utils import compute_wall_normals_torch, sample_interior_points_torch
-from models.base_networks import create_taa_networks, count_parameters
-from loss_functions.wss_loss import compute_wss_loss, compute_wss_metrics
-from loss_functions.physics_loss import compute_physics_loss
-from loss_functions.boundary_loss import compute_noslip_loss, compute_pressure_loss
+from src.data.loader import TAADataLoader
+from src.utils.geometry import compute_wall_normals_torch, sample_interior_points_torch
+from src.models.networks import create_taa_networks, count_parameters
+from src.losses.wss import compute_wss_loss, compute_wss_metrics
+from src.losses.physics import compute_physics_loss
+from src.utils.plotting import process_geometry as generate_comparison_plots
+from src.losses.boundary import compute_noslip_loss, compute_pressure_loss
 
 
 class TAATrainer:
@@ -98,15 +94,11 @@ class TAATrainer:
         self.resample_collocation_interval = self.config['physics'].get(
             'resample_collocation_interval', 0)
 
-        # Validation split: fraction of wall points held out for validation
-        self.validation_split = self.config['training'].get('validation_split', 0.0)
-
-        # Early stopping configuration
+        # Early stopping configuration (tracks training loss — no data split in PINNs)
         early_cfg = self.config['training'].get('early_stopping', {})
         self.early_stopping_enabled = early_cfg.get('enabled', False)
-        self.early_stopping_patience = int(early_cfg.get('patience', 1000))
-        self.early_stopping_min_delta = float(early_cfg.get('min_delta', 0.0))
-        self.early_stopping_warmup_epochs = int(early_cfg.get('warmup_epochs', 0))
+        self.early_stopping_patience = int(early_cfg.get('patience', 2000))
+        self.early_stopping_min_delta = float(early_cfg.get('min_delta', 1e-6))
         self.no_improve_count = 0
 
         # Initialize components (after all config attributes are set)
@@ -121,21 +113,30 @@ class TAATrainer:
         print("\nInitialization complete!")
 
     def _load_data(self):
-        """Load and prepare training data."""
+        """Load and prepare training data with non-dimensional reference scales."""
         print("\n" + "-" * 70)
-        print("LOADING DATA")
+        print("LOADING DATA (non-dimensional)")
         print("-" * 70)
 
-        # Initialize data loader
+        norm = self.config['data']['normalization']
+        physics = self.config['physics']
+
+        # Initialize data loader with fluid properties
         loader = TAADataLoader(
             data_dir=self.config['data']['data_dir'],
-            geometry_scale=self.config['data']['normalization']['length_scale'],
-            pressure_scale=self.config['data']['normalization']['pressure_scale'],
-            wss_scale=self.config['data']['normalization']['wss_scale'],
+            L_ref=norm['length_scale'],
+            rho=physics['rho'],
+            mu=physics['mu'],
             device=self.device
         )
 
-        # Load both phases
+        # First pass: compute reference scales from all training files
+        training_files = [self.config['data']['files'][p]
+                          for p in self.config['data']['phases']]
+        self.ref_scales = loader.compute_reference_scales(training_files)
+        self.Re = self.ref_scales['Re']
+
+        # Load both phases (second pass: normalize using computed scales)
         self.data = {}
         for phase in self.config['data']['phases']:
             filename = self.config['data']['files'][phase]
@@ -184,42 +185,7 @@ class TAATrainer:
             print(f"  Normals computed: {normals.shape}")
             print(f"  Phase encoding: {tensors['phase'][0].item()}")
 
-        # --- Validation split ---
-        if self.validation_split > 0:
-            self._split_validation_data()
-
         print(f"\nData loading complete!")
-
-    def _split_validation_data(self):
-        """Split wall points into train/validation sets for each phase."""
-        print(f"\n  Validation split: {self.validation_split:.0%}")
-        self.val_data = {}
-        for phase in self.config['data']['phases']:
-            tensors = self.data[phase]
-            n_total = tensors['x'].shape[0]
-            n_val = int(n_total * self.validation_split)
-            n_train = n_total - n_val
-
-            # Fixed random permutation (seeded)
-            rng = np.random.RandomState(self.config['random_seed'])
-            perm = torch.tensor(rng.permutation(n_total), device=self.device)
-
-            train_idx = perm[:n_train]
-            val_idx = perm[n_train:]
-
-            # Wall-point keys to split
-            wall_keys = ['x', 'y', 'z', 'phase', 'pressure', 'wss_x', 'wss_y',
-                         'wss_z', 'wss_magnitude', 'normals']
-
-            val_tensors = {}
-            for k in wall_keys:
-                if k in tensors:
-                    val_tensors[k] = tensors[k][val_idx]
-                    tensors[k] = tensors[k][train_idx]
-
-            # Interior points stay in training data (not split)
-            self.val_data[phase] = val_tensors
-            print(f"    {phase}: {n_train} train, {n_val} val wall points")
 
     def _resample_collocation_points(self):
         """Re-sample interior collocation points for physics loss."""
@@ -333,10 +299,9 @@ class TAATrainer:
         """
         tensors = self.data[phase]
         weights = self.config['loss_weights']
-        physics_params = self.config['physics']
-        norm = self.config['data']['normalization']
 
         # WSS Loss (CRITICAL) - Process in batches to save memory
+        # Non-dimensional: both prediction and target in viscous-scaled units
         wall_batch_size = self.config['training'].get('wall_batch_size', 2000)
         n_wall_points = tensors['x'].shape[0]
 
@@ -352,11 +317,6 @@ class TAATrainer:
                 tensors['phase'][i:end_idx],
                 tensors['wss_x'][i:end_idx], tensors['wss_y'][i:end_idx], tensors['wss_z'][i:end_idx],
                 tensors['normals'][i:end_idx],
-                mu=physics_params['mu'],
-                X_scale=norm['length_scale'],
-                Y_scale=norm['length_scale'],
-                Z_scale=norm['length_scale'],
-                U_scale=norm['velocity_scale']
             )
 
             loss_wss_total += loss_wss_batch * (end_idx - i) / n_wall_points
@@ -365,8 +325,9 @@ class TAATrainer:
         loss_wss = loss_wss_total
         wss_pred = torch.cat(wss_pred_list, dim=0)
 
-        # Physics Loss (Navier-Stokes) - Process in batches
-        interior_batch_size = physics_params.get('interior_batch_size', 500)
+        # Physics Loss (Non-dimensional N-S) - Process in batches
+        physics_cfg = self.config['physics']
+        interior_batch_size = physics_cfg.get('interior_batch_size', 500)
         n_interior_points = tensors['x_interior'].shape[0]
 
         loss_physics_total = 0.0
@@ -379,12 +340,7 @@ class TAATrainer:
                 self.networks['u'], self.networks['v'], self.networks['w'], self.networks['p'],
                 tensors['x_interior'][i:end_idx], tensors['y_interior'][i:end_idx],
                 tensors['z_interior'][i:end_idx], tensors['phase_interior'][i:end_idx],
-                rho=physics_params['rho'],
-                mu=physics_params['mu'],
-                X_scale=norm['length_scale'],
-                Y_scale=norm['length_scale'],
-                Z_scale=norm['length_scale'],
-                U_scale=norm['velocity_scale']
+                Re=self.Re,
             )
 
             loss_physics_total += loss_physics_batch * (end_idx - i) / n_interior_points
@@ -505,12 +461,15 @@ class TAATrainer:
 
         avg_loss = total_loss_sum / len(self.config['data']['phases'])
 
-        # Initialize loss normalization on first epoch
+        # Initialize loss normalization on first epoch.
+        # Floor of 1e-4 prevents tiny denominators (e.g. BC loss → 0 on
+        # training data) from inflating validation loss by orders of magnitude.
+        _NORM_FLOOR = 1e-4
         if self.loss_normalization and not self.loss_norms and phase_dicts:
             avg_raw = {k: np.mean([d[k] for d in phase_dicts])
                        for k in ['wss', 'physics', 'bc_noslip', 'pressure']}
             for k, v in avg_raw.items():
-                self.loss_norms[k] = max(v, 1e-8)  # avoid division by zero
+                self.loss_norms[k] = max(v, _NORM_FLOOR)
             print(f"\n  Loss normalization initialized: {self.loss_norms}")
 
         # Periodic renormalization: update norms to current loss magnitudes
@@ -520,17 +479,22 @@ class TAATrainer:
             avg_raw = {k: np.mean([d[k] for d in phase_dicts])
                        for k in ['wss', 'physics', 'bc_noslip', 'pressure']}
             for k, v in avg_raw.items():
-                self.loss_norms[k] = max(v, 1e-8)
+                self.loss_norms[k] = max(v, _NORM_FLOOR)
             print(f"\n  Loss norms updated (epoch {self.epoch}): {self.loss_norms}")
 
         return avg_loss, phase_dicts
 
     def evaluate(self):
-        """Evaluate on training data and print detailed metrics (no held-out set)."""
+        """Evaluate on training data and return detailed metrics per phase.
+
+        Returns:
+            List of dicts, one per phase, each containing losses and WSS metrics.
+        """
         print("\n" + "=" * 70)
         print(f"EVALUATION - Epoch {self.epoch}")
         print("=" * 70)
 
+        results = []
         for phase in self.config['data']['phases']:
             print(f"\n{phase.upper()}:")
 
@@ -562,46 +526,26 @@ class TAATrainer:
             print(f"    Momentum Z: {loss_dict['residual_momentum_z']:.6f}")
             print(f"    Continuity: {loss_dict['residual_continuity']:.6f}")
 
-    def evaluate_validation(self):
-        """Evaluate on held-out validation wall points and return average val loss."""
-        if not hasattr(self, 'val_data') or not self.val_data:
-            return None
+            results.append({
+                "phase": phase,
+                "epoch": self.epoch,
+                "dataset": "train",
+                "loss_total": loss_dict['total'],
+                "loss_wss": loss_dict['wss'],
+                "loss_physics": loss_dict['physics'],
+                "loss_bc_noslip": loss_dict['bc_noslip'],
+                "loss_pressure": loss_dict['pressure'],
+                "wss_relative_l2": metrics['relative_l2'],
+                "wss_correlation": metrics['correlation'],
+                "wss_mae": metrics['mae'],
+                "wss_rmse": metrics['rmse'],
+                "residual_momentum_x": loss_dict['residual_momentum_x'],
+                "residual_momentum_y": loss_dict['residual_momentum_y'],
+                "residual_momentum_z": loss_dict['residual_momentum_z'],
+                "residual_continuity": loss_dict['residual_continuity'],
+            })
 
-        val_losses = []
-        for phase in self.config['data']['phases']:
-            val_t = self.val_data[phase]
-            # Temporarily swap validation data into self.data for compute_total_loss
-            orig_tensors = self.data[phase]
-
-            # Build a temporary tensors dict with validation wall points
-            # but keep interior points from training data
-            tmp = {}
-            for k in val_t:
-                tmp[k] = val_t[k]
-            for k in ['x_interior', 'y_interior', 'z_interior', 'phase_interior']:
-                tmp[k] = orig_tensors[k]
-
-            self.data[phase] = tmp
-            with torch.no_grad():
-                _, loss_dict, wss_pred = self.compute_total_loss(phase)
-            self.data[phase] = orig_tensors
-
-            val_losses.append(loss_dict)
-
-            # Compute WSS metrics on validation set
-            wss_true = torch.cat([val_t['wss_x'], val_t['wss_y'], val_t['wss_z']], dim=1)
-            metrics = compute_wss_metrics(wss_pred, wss_true)
-
-            print(f"  VAL {phase.upper()}: "
-                  f"WSS={loss_dict['wss']:.6f}, "
-                  f"Physics={loss_dict['physics']:.6f}, "
-                  f"BC={loss_dict['bc_noslip']:.6f}, "
-                  f"Pressure={loss_dict['pressure']:.6f}, "
-                  f"RelL2={metrics['relative_l2']:.4f}, "
-                  f"Corr={metrics['correlation']:.4f}")
-
-        avg_val_loss = np.mean([d['total'] for d in val_losses])
-        return avg_val_loss
+        return results
 
     def save_checkpoint(self, filename='checkpoint.pt'):
         """Save training checkpoint."""
@@ -616,6 +560,8 @@ class TAATrainer:
             'no_improve_count': self.no_improve_count,
             'loss_norms': self.loss_norms,
             'renorm_interval': self.renorm_interval,
+            'ref_scales': self.ref_scales,
+            'Re': self.Re,
         }
 
         filepath = self.output_dir / filename
@@ -650,6 +596,24 @@ class TAATrainer:
         print(f"Resuming from epoch: {self.start_epoch}")
         print(f"Best loss so far: {self.best_loss:.6f}")
 
+    def _save_evaluation_metrics(self, eval_results):
+        """Save evaluation metrics to CSV.
+
+        Args:
+            eval_results: List of dicts from evaluate(), one per phase.
+        """
+        if not eval_results:
+            return
+
+        csv_path = self.output_dir / "evaluation_metrics.csv"
+        keys = list(eval_results[0].keys())
+        with open(csv_path, "w", newline="") as f:
+            writer = csv_mod.DictWriter(f, fieldnames=keys)
+            writer.writeheader()
+            writer.writerows(eval_results)
+
+        print(f"Evaluation metrics saved: {csv_path}")
+
     def _save_loss_history(self):
         """Save loss_history.csv and loss_curves.png to output directory."""
         if not self.loss_history:
@@ -657,9 +621,13 @@ class TAATrainer:
 
         # --- CSV ---
         csv_path = self.output_dir / "loss_history.csv"
-        keys = list(self.loss_history[0].keys())
+        # Collect ALL keys that appear in any history entry.
+        all_keys = dict.fromkeys(
+            k for entry in self.loss_history for k in entry
+        )
+        keys = list(all_keys)
         with open(csv_path, "w", newline="") as f:
-            writer = csv_mod.DictWriter(f, fieldnames=keys)
+            writer = csv_mod.DictWriter(f, fieldnames=keys, extrasaction='ignore')
             writer.writeheader()
             writer.writerows(self.loss_history)
 
@@ -708,17 +676,25 @@ class TAATrainer:
         print(f"Loss curves saved:  {self.output_dir / 'loss_curves.png'}")
 
     def train(self):
-        """Main training loop."""
+        """Main training loop.
+
+        PINNs training: all CFD data is used for supervision (no train/val
+        split).  The physics loss on collocation points acts as the
+        regularizer.  Early stopping tracks the total training loss.
+        """
         print("\n" + "=" * 70)
         print("STARTING TRAINING")
         print("=" * 70)
 
         total_epochs = self.config['training']['epochs']
-        eval_interval = self.config['training']['validate_interval']
+        eval_interval = self.config['training'].get('eval_interval', 500)
         save_interval = self.config['training']['save_interval']
         print(f"Total epochs: {total_epochs}")
         print(f"Evaluate interval: {eval_interval}")
         print(f"Save interval: {save_interval}")
+        if self.early_stopping_enabled:
+            print(f"Early stopping: patience={self.early_stopping_patience}, "
+                  f"min_delta={self.early_stopping_min_delta}")
 
         start_time = time.time()
 
@@ -744,12 +720,7 @@ class TAATrainer:
 
             lr = self.optimizers['u'].param_groups[0]['lr']
 
-            # Compute validation loss (before recording to history)
-            val_loss = None
-            if epoch % eval_interval == 0:
-                val_loss = self.evaluate_validation()
-
-            # Record loss history from the dicts already computed in train_epoch
+            # Record loss history
             avg_dict = {k: np.mean([d[k] for d in phase_dicts])
                         for k in phase_dicts[0]}
             history_entry = {
@@ -765,29 +736,23 @@ class TAATrainer:
                 "res_cont": avg_dict["residual_continuity"],
                 "lr": lr,
             }
-            if val_loss is not None:
-                history_entry["val_loss"] = val_loss
             self.loss_history.append(history_entry)
 
             # Update tqdm bar
             pbar.set_postfix(loss=f"{avg_loss:.4e}", lr=f"{lr:.1e}")
 
-            # Detailed evaluation
+            # Detailed evaluation (metrics, residuals)
             if epoch % eval_interval == 0:
                 self.evaluate()
-                if val_loss is not None:
-                    print(f"  Validation total loss: {val_loss:.6f}")
 
-            # Save checkpoint at intervals
+            # Persist loss history periodically
             if epoch % save_interval == 0:
-                self.save_checkpoint(f'checkpoint_epoch_{epoch}.pt')
+                self._save_loss_history()
 
-            # Best model tracking: save immediately when loss improves
-            # Use validation loss if available, otherwise training loss
-            tracking_loss = val_loss if val_loss is not None else avg_loss
-            improved = tracking_loss < (self.best_loss - self.early_stopping_min_delta)
+            # Best model tracking on training loss (PINNs — no data split)
+            improved = avg_loss < (self.best_loss - self.early_stopping_min_delta)
             if improved:
-                self.best_loss = tracking_loss
+                self.best_loss = avg_loss
                 self.no_improve_count = 0
                 self.save_checkpoint('best_model.pt')
             else:
@@ -795,23 +760,34 @@ class TAATrainer:
 
             if (
                 self.early_stopping_enabled
-                and epoch >= self.early_stopping_warmup_epochs
                 and self.no_improve_count >= self.early_stopping_patience
             ):
-                print("\nEarly stopping triggered.")
-                print(f"No improvement for {self.no_improve_count} epochs ")
-                print(f"(patience={self.early_stopping_patience}, min_delta={self.early_stopping_min_delta}).")
+                print(f"\nEarly stopping triggered at epoch {epoch}.")
+                print(f"No improvement for {self.no_improve_count} epochs "
+                      f"(patience={self.early_stopping_patience}, "
+                      f"min_delta={self.early_stopping_min_delta}).")
                 break
 
         # Final evaluation
         print("\n" + "=" * 70)
         print("TRAINING COMPLETE")
         print("=" * 70)
-        self.evaluate()
+        eval_results = self.evaluate()
 
-        # Save final model and loss curves
+        # Save final model, loss curves, and evaluation metrics
         self.save_checkpoint('final_model.pt')
         self._save_loss_history()
+        self._save_evaluation_metrics(eval_results)
+
+        # Generate CFD vs PINN comparison plots
+        geom = self.config['data']['geometry']
+        best_ckpt = self.output_dir / 'best_model.pt'
+        if best_ckpt.exists():
+            print("\nGenerating comparison plots...")
+            try:
+                generate_comparison_plots(geom, str(best_ckpt), self.device)
+            except Exception as e:
+                print(f"  Warning: comparison plot generation failed: {e}")
 
         total_time = time.time() - start_time
         print(f"\nTotal training time: {total_time/3600:.2f} hours")

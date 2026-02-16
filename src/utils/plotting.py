@@ -10,17 +10,16 @@ Uses the FULL dataset for prediction. Coordinate centering is consistent
 
 Usage:
   # Single geometry (best_model.pt):
-  python utils/generate_comparison_plots.py --geom AD5
+  python -m src.utils.plotting --geom AD5
 
   # All completed geometries:
-  python utils/generate_comparison_plots.py --all
+  python -m src.utils.plotting --all
 
   # Custom checkpoint:
-  python utils/generate_comparison_plots.py --geom AD5 --checkpoint experiments/AD5_adaptive_physics/best_model.pt
+  python -m src.utils.plotting --geom AD5 --checkpoint experiments/AD5_adaptive_physics/best_model.pt
 """
 
 import argparse
-import sys
 from pathlib import Path
 
 import matplotlib
@@ -31,12 +30,10 @@ import pandas as pd
 import torch
 import yaml
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+from src.models.networks import create_taa_networks
+from src.utils.geometry import compute_wall_normals_torch
 
-from models.base_networks import create_taa_networks
-from utils.geometry_utils import compute_wall_normals_torch
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # ── Geometry → config mapping ──────────────────────────────────────────────
 GEOM_INFO = {
@@ -99,15 +96,18 @@ def load_csv_data(filepath, subsample_factor=1):
     return df
 
 
-def prepare_data(df, geometry_scale, pressure_scale):
-    """Normalize exactly as TAADataLoader does: center then divide by scale."""
+def prepare_data(df, L_ref):
+    """Normalize coordinates as TAADataLoader does: center then divide by L_ref.
+
+    Pressure and WSS are returned raw; the caller converts using ref_scales.
+    """
     coords = np.column_stack([
         df['X [ m ]'].values,
         df['Y [ m ]'].values,
         df['Z [ m ]'].values,
     ])
     coords_mean = coords.mean(axis=0)
-    coords_norm = (coords - coords_mean) / geometry_scale
+    coords_norm = (coords - coords_mean) / L_ref
 
     pressure_raw = df['Pressure [ Pa ]'].values
     wss_x = df['Wall Shear X [ Pa ]'].values
@@ -120,7 +120,6 @@ def prepare_data(df, geometry_scale, pressure_scale):
         'coords_norm': coords_norm,
         'coords_mean': coords_mean,
         'pressure_raw': pressure_raw,
-        'pressure_norm': pressure_raw / pressure_scale,
         'wss_magnitude_raw': wss_mag,
         'wss_x_raw': wss_x,
         'wss_y_raw': wss_y,
@@ -130,8 +129,13 @@ def prepare_data(df, geometry_scale, pressure_scale):
 
 # ── WSS computation via autograd (same maths as wss_loss.py) ──────────────
 
-def compute_wss_from_networks(networks, x, y, z, t_phase, normals, mu, L):
-    """Compute predicted WSS components using autograd, matching the training loss."""
+def compute_wss_from_networks(networks, x, y, z, t_phase, normals, tau_ref):
+    """Compute predicted WSS in Pa using autograd, matching the non-dimensional training loss.
+
+    The model outputs non-dimensional velocity/pressure.  The non-dimensional
+    WSS (viscous-scaled) is tau_bar_ij = du_bar_i/dx_bar_j + du_bar_j/dx_bar_i.
+    Multiply by tau_ref to recover physical units (Pa).
+    """
     x = x.clone().detach().requires_grad_(True)
     y = y.clone().detach().requires_grad_(True)
     z = z.clone().detach().requires_grad_(True)
@@ -149,14 +153,15 @@ def compute_wss_from_networks(networks, x, y, z, t_phase, normals, mu, L):
             grads[f"{name}_{coord_name}"] = torch.autograd.grad(
                 field, coord, grad_outputs=ones,
                 create_graph=False, retain_graph=True,
-            )[0] / L  # scale correction: convert from normalized to physical coords
+            )[0]
 
-    tau_xx = 2 * mu * grads["u_x"]
-    tau_yy = 2 * mu * grads["v_y"]
-    tau_zz = 2 * mu * grads["w_z"]
-    tau_xy = mu * (grads["u_y"] + grads["v_x"])
-    tau_xz = mu * (grads["u_z"] + grads["w_x"])
-    tau_yz = mu * (grads["v_z"] + grads["w_y"])
+    # Non-dimensional stress tensor (viscous scaling: mu cancels)
+    tau_xx = 2.0 * grads["u_x"]
+    tau_yy = 2.0 * grads["v_y"]
+    tau_zz = 2.0 * grads["w_z"]
+    tau_xy = grads["u_y"] + grads["v_x"]
+    tau_xz = grads["u_z"] + grads["w_x"]
+    tau_yz = grads["v_z"] + grads["w_y"]
 
     nx, ny, nz = normals[:, 0:1], normals[:, 1:2], normals[:, 2:3]
     tx = tau_xx * nx + tau_xy * ny + tau_xz * nz
@@ -164,9 +169,15 @@ def compute_wss_from_networks(networks, x, y, z, t_phase, normals, mu, L):
     tz = tau_xz * nx + tau_yz * ny + tau_zz * nz
     t_dot_n = tx * nx + ty * ny + tz * nz
 
-    wss_x = tx - t_dot_n * nx
-    wss_y = ty - t_dot_n * ny
-    wss_z = tz - t_dot_n * nz
+    # Non-dimensional WSS (viscous-scaled)
+    wss_x_nd = tx - t_dot_n * nx
+    wss_y_nd = ty - t_dot_n * ny
+    wss_z_nd = tz - t_dot_n * nz
+
+    # Convert to physical units (Pa)
+    wss_x = wss_x_nd * tau_ref
+    wss_y = wss_y_nd * tau_ref
+    wss_z = wss_z_nd * tau_ref
     wss_mag = torch.sqrt(wss_x ** 2 + wss_y ** 2 + wss_z ** 2 + 1e-12)
 
     return wss_x.detach(), wss_y.detach(), wss_z.detach(), wss_mag.detach(), p.detach()
@@ -261,9 +272,12 @@ def process_geometry(geom, checkpoint_path=None, device="cuda"):
         net.load_state_dict(ckpt["networks"][name])
         net.eval()
 
-    mu = cfg["physics"]["mu"]
     L = norm["length_scale"]
-    pressure_scale = norm["pressure_scale"]
+
+    # Extract non-dimensional reference scales from checkpoint
+    ref_scales = ckpt.get("ref_scales", {})
+    P_ref = ref_scales.get("P_ref", 1.0)
+    tau_ref = ref_scales.get("tau_ref", 1.0)
     train_subsample = cfg["data"].get("subsample_factor", 1)
 
     # Read the geometry config for normal estimation params
@@ -287,7 +301,7 @@ def process_geometry(geom, checkpoint_path=None, device="cuda"):
         # mean in TAADataLoader (consistent regardless of subsample_factor),
         # so a single load at subsample=1 gives correctly centred coords.
         df_full = load_csv_data(filepath, subsample_factor=1)
-        full_data = prepare_data(df_full, L, pressure_scale)
+        full_data = prepare_data(df_full, L)
         coords_full_raw = full_data['coords_raw']
         coords_full_norm = full_data['coords_norm']
 
@@ -314,12 +328,13 @@ def process_geometry(geom, checkpoint_path=None, device="cuda"):
         )
 
         # Compute PINN predictions (batched)
+        # Model outputs are non-dimensional; convert back to Pa for plotting
         batch = 4000
         wss_x_list, wss_y_list, wss_z_list, wss_mag_list, p_list = [], [], [], [], []
         for i in range(0, n_pts, batch):
             j = min(i + batch, n_pts)
             wx, wy, wz, wm, pp = compute_wss_from_networks(
-                networks, x[i:j], y[i:j], z[i:j], t[i:j], normals[i:j], mu, L,
+                networks, x[i:j], y[i:j], z[i:j], t[i:j], normals[i:j], tau_ref,
             )
             wss_x_list.append(wx.cpu())
             wss_y_list.append(wy.cpu())
@@ -331,7 +346,7 @@ def process_geometry(geom, checkpoint_path=None, device="cuda"):
         pinn_wss_x   = torch.cat(wss_x_list).numpy().flatten()
         pinn_wss_y   = torch.cat(wss_y_list).numpy().flatten()
         pinn_wss_z   = torch.cat(wss_z_list).numpy().flatten()
-        pinn_pressure = torch.cat(p_list).numpy().flatten() * pressure_scale
+        pinn_pressure = torch.cat(p_list).numpy().flatten() * P_ref
 
         # Print quick metrics
         for fname, cfd, pinn in [

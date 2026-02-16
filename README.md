@@ -4,28 +4,32 @@
 
 This project implements Physics-Informed Neural Networks (PINNs) for hemodynamic analysis of Thoracic Aortic Aneurysms (TAAs) using Computational Fluid Dynamics (CFD) data. The key innovation is using **wall shear stress (WSS) data** to constrain the learning of interior velocity and pressure fields, rather than requiring sparse interior velocity measurements.
 
-**Current Version**: Adaptive Physics Training
+**Current Version**: Non-Dimensional Formulation with Re-Based Physics
+- **Full non-dimensionalization** with proper Reynolds number formulation
+- Reference scales auto-computed from data and fluid properties
+- Correct blood properties: ρ = 1060 kg/m³, μ = 0.0035 Pa·s
 - Physics loss annealing for stable convergence
 - Periodic loss renormalization to prevent component stagnation
 - Dynamic collocation point resampling for better coverage
 - Validation split (20%) for generalization monitoring
-- Consistent coordinate centering regardless of subsampling
 
 ## Project Status
 
 ✅ **Implemented**:
 - Four-network architecture (u, v, w, p) with Fourier features
-- WSS-constrained training with automatic differentiation
-- Navier-Stokes physics enforcement
+- **Proper non-dimensionalization** with Re-based formulation (Re ≈ 9,400)
+- WSS-constrained training with automatic differentiation (viscous scaling)
+- Navier-Stokes physics enforcement with correct blood properties
 - Adaptive loss balancing and physics annealing
 - Validation metrics and early stopping
 - CFD vs PINN comparison visualization
 
-⚠️ **Known Issues Fixed**:
-- Previous versions had physics loss divergence (λ_physics=0.1 was too low)
-- Coordinate centering now consistent between training and evaluation
-- Loss normalization now updates periodically to track changing magnitudes
-- Best model saves immediately on improvement (not just at checkpoint intervals)
+⚠️ **Recent Major Improvements**:
+- **V4 (Current)**: Full non-dimensionalization with proper Re formulation, correct blood properties
+- **V3**: Physics loss divergence fixed (λ_physics restored to 1.0 with annealing)
+- **V3**: Coordinate centering now consistent between training and evaluation
+- **V3**: Loss normalization updates periodically to track changing magnitudes
+- **V3**: Best model saves immediately on improvement
 
 ## Table of Contents
 
@@ -45,18 +49,22 @@ This project implements Physics-Informed Neural Networks (PINNs) for hemodynamic
 ```bash
 # 1. Install dependencies
 conda activate deep_tf  # or your environment
+pip install -r requirements.txt
 
 # 2. Train a single geometry
-python training/train_single_geometry.py --config configs/AD5_config.yaml
+python -m src.training.trainer --config configs/AS5_config.yaml
 
-# 3. Train all geometries (HPC)
-bash hpc/run_adaptive_physics_training.sh
+# 3. Train all geometries
+bash scripts/run_training.sh
 
-# 4. Generate comparison plots
-python utils/generate_comparison_plots.py --geom AD5
+# 4. Train a subset of geometries
+GEOMS="AS5 AD5" bash scripts/run_training.sh
 
-# 5. Monitor training
-tail -f hpc/logs/gpu1_adaptive_physics_*.log
+# 5. Generate comparison plots
+python -m src.utils.plotting --geom AS5
+
+# 6. Monitor training
+tail -f logs/gpu1_*.log
 ```
 
 ---
@@ -154,6 +162,118 @@ Output (scalar field)
 
 ## Training Methodology
 
+### Non-Dimensional Formulation
+
+**NEW in V4**: The codebase now uses proper non-dimensionalization with a Reynolds-number-based formulation, ensuring dimensional consistency and physical correctness.
+
+#### Reference Scales (Auto-Computed)
+
+The data loader automatically computes reference scales from the training data and fluid properties:
+
+```python
+# Physical Properties (standard blood)
+rho = 1060 kg/m³     # Blood density
+mu  = 0.0035 Pa·s    # Dynamic viscosity (Carreau-Yasuda μ_∞)
+
+# Geometric Scale
+L_ref = 0.05 m       # Characteristic length (vessel diameter)
+
+# Derived from Data
+P_char = max(|p|) across all training data  # ≈ 407 Pa for AS5
+U_ref = sqrt(P_char / rho)                  # ≈ 0.62 m/s (characteristic velocity)
+P_ref = rho × U_ref²                        # ≈ 407 Pa (by construction)
+tau_ref = mu × U_ref / L_ref                # ≈ 0.0434 Pa (viscous stress scale)
+
+# Reynolds Number
+Re = rho × U_ref × L_ref / mu               # ≈ 9,383 (physiological range)
+```
+
+**Key Insight**: U_ref is derived from pressure data (not arbitrary), giving a physically-motivated characteristic velocity consistent with Bernoulli's principle.
+
+#### Non-Dimensional Variables
+
+All physical quantities are normalized:
+
+```
+Coordinates:  x_bar = (x - x_mean) / L_ref
+Velocity:     u_bar = u / U_ref
+Pressure:     p_bar = p / P_ref = p / (rho × U_ref²)
+WSS (viscous):tau_bar = tau / tau_ref = tau / (mu × U_ref / L_ref)
+Time:         t_bar = t × U_ref / L_ref  (for unsteady, if needed)
+```
+
+#### Non-Dimensional Equations
+
+**Momentum (Navier-Stokes)**:
+```
+u_bar · ∇u_bar = -∇p_bar + (1/Re) × ∇²u_bar
+```
+
+**Continuity**:
+```
+∇ · u_bar = 0
+```
+
+**WSS (viscous scaling)**:
+```
+tau_bar_ij = ∂u_bar_i/∂x_bar_j + ∂u_bar_j/∂x_bar_i
+
+WSS_bar = tangential(tau_bar · n)
+```
+
+**Key Property**: In the viscous-scaled WSS formulation, the explicit μ factor **cancels out** between the prediction (which uses ∂u_bar/∂x_bar) and the target (which is tau/tau_ref = tau/(mu×U/L)). This makes the WSS loss cleaner and more numerically stable.
+
+#### Benefits of This Formulation
+
+1. **Dimensional Consistency**: All terms in momentum equation are O(1), preventing one term from dominating
+2. **Physical Correctness**: Uses actual blood properties (not unit values)
+3. **Proper Re Formulation**: Physics loss is controlled by a single physical parameter (Re)
+4. **Numerical Stability**: All fields normalized to similar magnitudes
+5. **Research-Ready**: Standard formulation used in published CFD/PINN papers
+
+#### Comparison with Previous Version
+
+| Aspect | V3 (Old) | V4 (Current) |
+|--------|----------|--------------|
+| ρ | 1.0 kg/m³ (arbitrary) | 1060 kg/m³ (blood) |
+| μ | 0.00125 Pa·s (arbitrary) | 0.0035 Pa·s (blood) |
+| Pressure norm | Fixed 100 Pa | Auto: ~407 Pa (from data) |
+| WSS norm | Fixed 1 Pa | Auto: ~0.043 Pa (viscous scale) |
+| Physics form | Manual scaling factors | Clean Re-based formulation |
+| Re | Not computed | 9,383 (physiological) |
+
+#### Startup Log Output
+
+When training starts, the reference scales are computed and displayed:
+
+```
+======================================================================
+TAA-PINN TRAINING
+======================================================================
+Experiment: AS5_adaptive_physics
+Description: Non-dimensional formulation: Re-based physics, auto-computed reference scales, blood properties
+Geometry: AS5
+
+----------------------------------------------------------------------
+LOADING DATA (non-dimensional)
+----------------------------------------------------------------------
+
+  Non-dimensional reference scales:
+    L_ref     = 0.0500 m
+    U_ref     = 0.6196 m/s  (from max|p|=406.96 Pa)
+    P_ref     = 406.96 Pa  (= rho * U_ref^2)
+    tau_ref   = 0.043373 Pa  (= mu * U_ref / L_ref)
+    Re        = 9382.8
+    rho       = 1060.0 kg/m^3
+    mu        = 0.003500 Pa.s
+```
+
+These values are stored in checkpoints for reproducibility.
+
+---
+
+## Training Methodology (Continued)
+
 ### Adaptive Physics Training Strategy
 
 The current training approach implements several key improvements over standard PINN training to ensure stable convergence and prevent physics loss divergence:
@@ -196,16 +316,26 @@ The current training approach implements several key improvements over standard 
 ### Loss Weight Configuration
 
 ```yaml
+# Fluid Properties (standard blood)
+physics:
+  rho: 1060.0                   # kg/m³ (blood density)
+  mu: 0.0035                    # Pa·s (Carreau-Yasuda μ_inf)
+  n_interior_points: 2000       # Collocation points
+  resample_collocation_interval: 1000  # Resampling frequency
+
+# Normalization (auto-computed from data + properties)
+data:
+  normalization:
+    length_scale: 0.05          # L_ref (m) - vessel diameter
+    # U_ref, P_ref, tau_ref, Re computed automatically
+
+# Loss Weights
 loss_weights:
   lambda_WSS: 50.0              # Wall shear stress (CRITICAL constraint)
-  lambda_physics: 1.0           # Navier-Stokes (restored from 0.1)
+  lambda_physics: 1.0           # Navier-Stokes (non-dimensional)
   lambda_BC_noslip: 20.0        # No-slip boundary condition
   lambda_pressure: 10.0         # Pressure matching
   physics_ramp_epochs: 2000     # Annealing duration
-
-physics:
-  n_interior_points: 2000       # Collocation points
-  resample_collocation_interval: 1000  # Resampling frequency
   
 training:
   renorm_interval: 500          # Loss renormalization frequency
@@ -213,6 +343,8 @@ training:
   epochs: 15000                 # Total training epochs
   save_interval: 2500           # Checkpoint frequency
 ```
+
+**Note on Loss Magnitudes**: After non-dimensionalization, raw loss magnitudes are different from V3. The adaptive `loss_normalization: true` automatically adjusts normalization factors on the first epoch and every 500 epochs thereafter, so the same weights work well.
 
 ### Expected Training Behavior
 
@@ -730,43 +862,54 @@ trainer.load_checkpoint('experiments/AS5_baseline/checkpoint_epoch_5000.pt')
 ```
 TAA-aneurysm/
 │
-├── configs/                      # Configuration files
-│   └── AS5_config.yaml          # Hyperparameters for AS5 geometry
-│
-├── data_loaders/                 # Data loading and preprocessing
+├── src/                              # All source code (Python package)
 │   ├── __init__.py
-│   └── csv_loader.py            # Parse CSV, normalize, create tensors
+│   ├── data/                         # Data loading and preprocessing
+│   │   ├── __init__.py
+│   │   └── loader.py                # Parse CSV, normalize, create tensors
+│   ├── models/                       # Neural network architectures
+│   │   ├── __init__.py
+│   │   ├── networks.py              # Main network classes (TAANet, Net2_u/v/w/p)
+│   │   ├── fourier.py              # Fourier feature encoding
+│   │   └── blocks.py               # Residual block with skip connections
+│   ├── losses/                       # Physics-informed loss functions
+│   │   ├── __init__.py
+│   │   ├── wss.py                   # WSS matching (critical innovation)
+│   │   ├── physics.py              # Navier-Stokes equations
+│   │   └── boundary.py             # No-slip BC, pressure matching
+│   ├── training/                     # Training loop
+│   │   ├── __init__.py
+│   │   └── trainer.py              # TAATrainer class and main entry point
+│   └── utils/                        # Utility functions
+│       ├── __init__.py
+│       ├── geometry.py              # Wall normals, interior sampling
+│       └── plotting.py             # CFD vs PINN comparison plots
 │
-├── models/                       # Neural network architectures
-│   ├── __init__.py
-│   ├── base_networks.py         # Main network classes (Net2_u/v/w/p)
-│   ├── fourier_features.py      # Fourier feature encoding
-│   └── residual_blocks.py       # Residual block with skip connections
+├── configs/                          # YAML configuration files (one per geometry)
+│   ├── AS5_config.yaml
+│   ├── AD5_config.yaml
+│   ├── PD5_config.yaml
+│   ├── AS6_config.yaml
+│   ├── AD6_config.yaml
+│   └── PD6_config.yaml
 │
-├── loss_functions/               # Physics-informed loss functions
-│   ├── __init__.py
-│   ├── wss_loss.py              # WSS matching (CRITICAL INNOVATION)
-│   ├── physics_loss.py          # Navier-Stokes equations
-│   └── boundary_loss.py         # No-slip BC, pressure matching
+├── data/                             # CFD data (12 CSV files, 6 geometries x 2 phases)
 │
-├── training/                     # Training scripts
-│   ├── __init__.py
-│   ├── train_single_geometry.py # Main training loop
-│   └── hyperparameter_tuning.py # Optuna integration (TODO)
+├── experiments/                      # Training outputs (one subdir per geometry)
+│   └── AS5_adaptive_physics/
+│       ├── config.yaml              # Saved config snapshot
+│       ├── best_model.pt            # Best model during training
+│       ├── final_model.pt           # Model at end of training
+│       ├── loss_history.csv         # Epoch-level metrics
+│       └── loss_curves.png          # Training curves plot
 │
-├── utils/                        # Utility functions
-│   ├── __init__.py
-│   ├── geometry_utils.py        # Wall normals, interior sampling
-│   └── plot_2d_slices.py        # Paper-ready XY/XZ/YZ 2D projections
+├── scripts/                          # Shell launch scripts
+│   └── run_training.sh             # GPU training launcher
 │
-├── experiments/                  # Training outputs
-│   └── AS5_baseline/
-│       ├── config.yaml
-│       ├── checkpoints/
-│       ├── logs/
-│       └── vtk_outputs/
-│
-└── README.md                    # This file
+├── logs/                             # Training log files (gitignored)
+├── requirements.txt                  # Python dependencies
+├── .gitignore
+└── README.md
 ```
 
 ### Key Files Explained
@@ -777,32 +920,41 @@ TAA-aneurysm/
 - Computes statistics
 - Creates PyTorch tensors on GPU
 
-**2. `geometry_utils.py`** (251 lines)
+**2. `src/utils/geometry.py`**
 - Uses Open3D to compute wall normal vectors
 - Samples interior collocation points
 - Validates normal vector quality
 
-**3. `base_networks.py`** (236 lines)
+**3. `src/models/networks.py`**
 - Defines TAANet class with Fourier features + residual blocks
 - Creates all 4 networks (u, v, w, p)
 - Kaiming initialization for stable training
 
-**4. `wss_loss.py`** (206 lines) - **MOST IMPORTANT**
+**4. `src/losses/wss.py`** - **MOST IMPORTANT**
 - Computes 9 velocity gradients via automatic differentiation
-- Builds stress tensor from gradients
+- Builds non-dimensional stress tensor: `tau_bar = ∇u_bar + (∇u_bar)ᵀ`
+- **Viscous scaling**: μ cancels out (both pred and target scaled by tau_ref = μ×U/L)
 - Extracts tangential component (WSS)
 - Compares with CFD ground truth
 
-**5. `physics_loss.py`** (200 lines)
-- Enforces 3D Navier-Stokes momentum equations
-- Enforces continuity (divergence-free)
-- Accounts for coordinate scaling
+**5. `src/losses/physics.py`**
+- Enforces 3D non-dimensional Navier-Stokes: `u·∇u + ∇p - (1/Re)×∇²u = 0`
+- Enforces continuity (divergence-free): `∇·u = 0`
+- **Single parameter**: Reynolds number Re ≈ 9,383
+- Clean formulation with no manual scaling factors
 
-**6. `train_single_geometry.py`** (436 lines)
-- Main training orchestration
-- Batched loss computation
-- Validation and checkpointing
+**6. `src/training/trainer.py`**
+- TAATrainer class: main training orchestration
+- Auto-computes reference scales (U_ref, P_ref, tau_ref, Re) from data
+- Batched loss computation for memory efficiency
+- Validation and checkpointing (stores ref_scales for reproducibility)
 - Progress logging
+
+**7. `src/data/loader.py`**
+- TAADataLoader: loads CFD CSV files
+- **Two-pass loading**: First pass finds max(|p|) to compute U_ref
+- Normalizes all data with physically-consistent scales
+- Returns Re and all reference scales for training
 
 ---
 
@@ -840,10 +992,12 @@ Boundary Condition Violation: < 1e-3
 - [ ] No gradient explosions (check NaN in logs)
 
 **3. Physical Plausibility**:
-- [ ] Maximum velocity < 2 m/s (physiological range)
+- [ ] Maximum velocity < 2 m/s (physiological range for aortic flow)
+- [ ] Reynolds number ≈ 9,000-10,000 (matches typical aortic Re)
 - [ ] Pressure gradient negative in flow direction
 - [ ] Velocity magnitude decreases from systole to diastole
 - [ ] Recirculation zones present in aneurysm bulge
+- [ ] WSS values in range 0-5 Pa (typical for aortic wall)
 
 ### Common Issues & Solutions
 

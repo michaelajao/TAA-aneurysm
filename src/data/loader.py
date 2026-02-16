@@ -1,8 +1,20 @@
 """
 TAA Data Loader for CSV Files
-Parses TAA CFD data from CSV format and prepares tensors for PINN training
+
+Parses TAA CFD data from CSV format, computes non-dimensional reference scales
+from the data and fluid properties, and prepares tensors for PINN training.
+
+Non-dimensionalization:
+    x_bar = (x - x_mean) / L_ref
+    u_bar = u / U_ref
+    p_bar = p / P_ref        where P_ref = rho * U_ref^2
+    tau_bar = tau / tau_ref   where tau_ref = mu * U_ref / L_ref
+
+    U_ref = sqrt(max|p| / rho)   (characteristic velocity from pressure data)
+    Re = rho * U_ref * L_ref / mu (Reynolds number)
 """
 
+import math
 import numpy as np
 import pandas as pd
 import torch
@@ -16,6 +28,7 @@ class TAADataLoader:
 
     Handles:
     - Parsing CSV files with custom header format
+    - Computing non-dimensional reference scales from data and fluid properties
     - Coordinate normalization and centering
     - Extraction of wall boundary data (coordinates, pressure, WSS)
     - Preparation of PyTorch tensors
@@ -23,25 +36,31 @@ class TAADataLoader:
 
     def __init__(self,
                  data_dir: str,
-                 geometry_scale: float = 0.05,  # 5cm default
-                 pressure_scale: float = 100.0,  # Pa
-                 wss_scale: float = 1.0,  # Pa
+                 L_ref: float = 0.05,
+                 rho: float = 1060.0,
+                 mu: float = 0.0035,
                  device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
         """
         Initialize the TAA data loader.
 
         Args:
             data_dir: Directory containing CSV files
-            geometry_scale: Characteristic length for normalization (m)
-            pressure_scale: Pressure scale for normalization (Pa)
-            wss_scale: WSS scale for normalization (Pa)
+            L_ref: Characteristic length for normalization (m), e.g. vessel diameter
+            rho: Fluid density (kg/m^3)
+            mu: Dynamic viscosity (Pa.s)
             device: Device for tensor placement ('cuda' or 'cpu')
         """
         self.data_dir = data_dir
-        self.geometry_scale = geometry_scale
-        self.pressure_scale = pressure_scale
-        self.wss_scale = wss_scale
+        self.L_ref = L_ref
+        self.rho = rho
+        self.mu = mu
         self.device = device
+
+        # Reference scales (populated by compute_reference_scales)
+        self.U_ref = None
+        self.P_ref = None
+        self.tau_ref = None
+        self.Re = None
 
         # Geometry code mapping
         self.geometry_map = {
@@ -59,6 +78,74 @@ class TAADataLoader:
             'diastolic': 0.0
         }
 
+    def compute_reference_scales(self, filenames: List[str]) -> Dict[str, float]:
+        """
+        Compute non-dimensional reference scales from the training data.
+
+        First pass over all specified files to find max(|pressure|), then derive:
+            U_ref = sqrt(max|p| / rho)
+            P_ref = rho * U_ref^2   (= max|p| by construction)
+            tau_ref = mu * U_ref / L_ref
+            Re = rho * U_ref * L_ref / mu
+
+        Args:
+            filenames: List of CSV filenames to scan for pressure range
+
+        Returns:
+            Dictionary with U_ref, P_ref, tau_ref, Re
+        """
+        max_abs_pressure = 0.0
+
+        for filename in filenames:
+            filepath = os.path.join(self.data_dir, filename)
+            header_idx = self._find_header_row(filepath)
+            df = pd.read_csv(filepath, skiprows=list(range(header_idx)), low_memory=False)
+            df.columns = df.columns.str.strip()
+            df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
+            for col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            df = df.dropna().reset_index(drop=True)
+
+            pressure = df['Pressure [ Pa ]'].values.astype(float)
+            file_max = np.abs(pressure).max()
+            max_abs_pressure = max(max_abs_pressure, file_max)
+
+        # Derive reference scales
+        self.U_ref = math.sqrt(max_abs_pressure / self.rho)
+        self.P_ref = self.rho * self.U_ref ** 2  # = max_abs_pressure
+        self.tau_ref = self.mu * self.U_ref / self.L_ref
+        self.Re = self.rho * self.U_ref * self.L_ref / self.mu
+
+        scales = {
+            'L_ref': self.L_ref,
+            'U_ref': self.U_ref,
+            'P_ref': self.P_ref,
+            'tau_ref': self.tau_ref,
+            'Re': self.Re,
+            'rho': self.rho,
+            'mu': self.mu,
+            'max_abs_pressure_Pa': max_abs_pressure,
+        }
+
+        print("\n  Non-dimensional reference scales:")
+        print(f"    L_ref     = {self.L_ref:.4f} m")
+        print(f"    U_ref     = {self.U_ref:.4f} m/s  (from max|p|={max_abs_pressure:.2f} Pa)")
+        print(f"    P_ref     = {self.P_ref:.2f} Pa  (= rho * U_ref^2)")
+        print(f"    tau_ref   = {self.tau_ref:.6f} Pa  (= mu * U_ref / L_ref)")
+        print(f"    Re        = {self.Re:.1f}")
+        print(f"    rho       = {self.rho:.1f} kg/m^3")
+        print(f"    mu        = {self.mu:.6f} Pa.s")
+
+        return scales
+
+    def _find_header_row(self, filepath: str) -> int:
+        """Find the row index containing column headers in a CSV file."""
+        with open(filepath, 'r', encoding='utf-8') as f:
+            for i, line in enumerate(f):
+                if 'X [ m ]' in line:
+                    return i
+        raise ValueError(f"Could not find header in {filepath}")
+
     def load_single_case(self,
                         filename: str,
                         subsample_factor: int = 1) -> Dict[str, np.ndarray]:
@@ -68,51 +155,31 @@ class TAADataLoader:
         Coordinate centering uses the FULL dataset mean (before subsampling)
         so that the centering is consistent regardless of subsample_factor.
 
+        Requires compute_reference_scales() to have been called first.
+
         Args:
             filename: Name of CSV file (e.g., '5cm diastolic.csv')
             subsample_factor: Sample every Nth point (1 = all points)
 
         Returns:
-            Dictionary containing:
-                - coords: (N, 3) array of x, y, z coordinates
-                - pressure: (N, 1) array of pressure values
-                - wss_magnitude: (N, 1) array of WSS magnitude
-                - wss_components: (N, 3) array of WSS x, y, z components
-                - phase: Scalar (0.0 for diastolic, 1.0 for systolic)
-                - geometry: String geometry code
-                - coords_mean: (3,) the centering mean (from full data)
+            Dictionary containing normalized (non-dimensional) data and raw values.
         """
+        if self.U_ref is None:
+            raise RuntimeError(
+                "Reference scales not computed. Call compute_reference_scales() first."
+            )
+
         filepath = os.path.join(self.data_dir, filename)
 
-        # Read CSV with custom header (skip [Name] and [Data] rows)
-        with open(filepath, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-
-        # Find the header row (contains column names)
-        header_idx = None
-        for i, line in enumerate(lines):
-            if 'X [ m ]' in line:
-                header_idx = i
-                break
-
-        if header_idx is None:
-            raise ValueError(f"Could not find header in {filename}")
-
-        # Read data starting AFTER header row (header_idx is the header, data starts at header_idx+1)
-        # But pandas will use header_idx row as column names if we use header=0
+        # Read CSV with custom header
+        header_idx = self._find_header_row(filepath)
         df = pd.read_csv(filepath, skiprows=list(range(header_idx)), low_memory=False)
 
-        # Extract columns (handle potential whitespace in column names and values)
+        # Clean columns
         df.columns = df.columns.str.strip()
-
-        # Strip whitespace from all string values
         df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
-
-        # Convert all numeric columns to float
         for col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
-
-        # Drop rows with any NaN values (these are likely header rows or empty rows)
         df = df.dropna().reset_index(drop=True)
 
         # Compute centering mean from FULL dataset BEFORE subsampling
@@ -132,26 +199,23 @@ class TAADataLoader:
         z = df['Z [ m ]'].values.astype(float)
         coords = np.column_stack([x, y, z])
 
-        # Center coordinates using full-dataset mean (consistent across subsample factors)
+        # Non-dimensionalize coordinates: x_bar = (x - x_mean) / L_ref
         coords_centered = coords - coords_mean
+        coords_nondim = coords_centered / self.L_ref
 
-        # Normalize by geometry scale
-        coords_normalized = coords_centered / self.geometry_scale
-
-        # Extract pressure
+        # Non-dimensionalize pressure: p_bar = p / P_ref
         pressure = df['Pressure [ Pa ]'].values.astype(float).reshape(-1, 1)
-        pressure_normalized = pressure / self.pressure_scale
+        pressure_nondim = pressure / self.P_ref
 
-        # Extract WSS components
+        # Non-dimensionalize WSS: tau_bar = tau / tau_ref
         wss_x = df['Wall Shear X [ Pa ]'].values.astype(float)
         wss_y = df['Wall Shear Y [ Pa ]'].values.astype(float)
         wss_z = df['Wall Shear Z [ Pa ]'].values.astype(float)
         wss_components = np.column_stack([wss_x, wss_y, wss_z])
-        wss_components_normalized = wss_components / self.wss_scale
+        wss_components_nondim = wss_components / self.tau_ref
 
-        # Calculate WSS magnitude
         wss_magnitude = df['Wall Shear [ Pa ]'].values.astype(float).reshape(-1, 1)
-        wss_magnitude_normalized = wss_magnitude / self.wss_scale
+        wss_magnitude_nondim = wss_magnitude / self.tau_ref
 
         # Determine phase from filename
         phase_str = 'systolic' if 'systolic' in filename.lower() else 'diastolic'
@@ -161,19 +225,19 @@ class TAADataLoader:
         geometry_code = self._parse_geometry_from_filename(filename)
 
         return {
-            'coords': coords_normalized,
-            'coords_raw': coords,  # Keep raw for visualization
-            'coords_mean': coords_mean,  # Full-data centering mean
-            'pressure': pressure_normalized,
+            'coords': coords_nondim,
+            'coords_raw': coords,
+            'coords_mean': coords_mean,
+            'pressure': pressure_nondim,
             'pressure_raw': pressure,
-            'wss_magnitude': wss_magnitude_normalized,
+            'wss_magnitude': wss_magnitude_nondim,
             'wss_magnitude_raw': wss_magnitude,
-            'wss_components': wss_components_normalized,
+            'wss_components': wss_components_nondim,
             'wss_components_raw': wss_components,
             'phase': phase_value,
             'phase_str': phase_str,
             'geometry': geometry_code,
-            'n_points': coords_normalized.shape[0]
+            'n_points': coords_nondim.shape[0]
         }
 
     def _parse_geometry_from_filename(self, filename: str) -> str:
@@ -206,11 +270,12 @@ class TAADataLoader:
         Returns:
             Dictionary with keys (geometry_code, phase) and values from load_single_case()
         """
-        # List all CSV files in directory
         csv_files = [f for f in os.listdir(self.data_dir) if f.endswith('.csv')]
 
-        all_data = {}
+        # Compute reference scales from all files
+        self.compute_reference_scales(csv_files)
 
+        all_data = {}
         for filename in csv_files:
             try:
                 data = self.load_single_case(filename, subsample_factor)
@@ -237,7 +302,7 @@ class TAADataLoader:
         """
         tensors = {}
 
-        # Coordinates
+        # Coordinates (non-dimensional)
         x = torch.tensor(data['coords'][:, 0:1], dtype=torch.float32, device=self.device)
         y = torch.tensor(data['coords'][:, 1:2], dtype=torch.float32, device=self.device)
         z = torch.tensor(data['coords'][:, 2:3], dtype=torch.float32, device=self.device)
@@ -252,11 +317,11 @@ class TAADataLoader:
                              dtype=torch.float32, device=self.device)
             tensors['phase'] = phase
 
-        # Pressure
+        # Pressure (non-dimensional)
         pressure = torch.tensor(data['pressure'], dtype=torch.float32, device=self.device)
         tensors['pressure'] = pressure
 
-        # WSS components
+        # WSS components (non-dimensional, viscous scaling)
         wss_x = torch.tensor(data['wss_components'][:, 0:1], dtype=torch.float32, device=self.device)
         wss_y = torch.tensor(data['wss_components'][:, 1:2], dtype=torch.float32, device=self.device)
         wss_z = torch.tensor(data['wss_components'][:, 2:3], dtype=torch.float32, device=self.device)
@@ -265,7 +330,7 @@ class TAADataLoader:
         tensors['wss_y'] = wss_y
         tensors['wss_z'] = wss_z
 
-        # WSS magnitude
+        # WSS magnitude (non-dimensional)
         wss_mag = torch.tensor(data['wss_magnitude'], dtype=torch.float32, device=self.device)
         tensors['wss_magnitude'] = wss_mag
 
@@ -273,7 +338,7 @@ class TAADataLoader:
 
     def get_statistics(self, data: Dict[str, np.ndarray]) -> Dict[str, float]:
         """
-        Compute statistics for a loaded dataset.
+        Compute statistics for a loaded dataset (non-dimensional values).
 
         Args:
             data: Output from load_single_case()
