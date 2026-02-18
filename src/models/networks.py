@@ -125,7 +125,18 @@ class Net2_nut(TAANet):
     """Network for non-dimensional turbulent viscosity nu_t_bar.
 
     Output is passed through softplus to guarantee nu_t >= 0.
+    The decoder bias is initialised so that the initial output is
+    approximately 10x the molecular viscosity (1/Re), giving the
+    physics loss something to work with from epoch 1.
     """
+
+    def __init__(self, *args, initial_nut: float = 0.001, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set decoder bias so softplus(bias) ≈ initial_nut.
+        # softplus^{-1}(y) = log(exp(y) - 1); for small y this is ≈ log(y).
+        import math
+        bias_val = math.log(math.expm1(max(initial_nut, 1e-8)))
+        nn.init.constant_(self.decoder.bias, bias_val)
 
     def forward(self, x):
         raw = super().forward(x)

@@ -103,6 +103,7 @@ class TAATrainer:
         self.adaptive_weights_alpha = aw_cfg.get('alpha', 0.1)
         self.adaptive_weights_update_interval = aw_cfg.get('update_interval', 100)
         self.adaptive_weights_ref_loss = aw_cfg.get('reference_loss', 'wss')
+        self.physics_weight_floor = aw_cfg.get('physics_weight_floor', 0.0)
         self.adaptive_weights = {}  # {name: float} -- populated on first update
         self._last_grad_norms = {}  # for logging: most recent per-loss grad norms
 
@@ -538,6 +539,12 @@ class TAATrainer:
                     (1.0 - alpha) * self.adaptive_weights[name] + alpha * raw_weight)
             else:
                 self.adaptive_weights[name] = raw_weight
+
+        # Enforce floor on physics weight — essential for RANS with learnable
+        # nu_t, otherwise net_nut receives no gradient signal.
+        if self.physics_weight_floor > 0 and 'physics' in self.adaptive_weights:
+            self.adaptive_weights['physics'] = max(
+                self.adaptive_weights['physics'], self.physics_weight_floor)
 
     def train_epoch(self):
         """Train for one epoch. Returns (avg_loss, list_of_loss_dicts)."""

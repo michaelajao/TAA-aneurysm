@@ -54,13 +54,14 @@ loss_weights:
   lambda_BC_noslip: 1.0
   lambda_WSS: 1.0
   lambda_pressure: 1.0
-  physics_ramp_epochs: 2000
+  physics_ramp_epochs: 0
 
 adaptive_weights:
   enabled: true
   alpha: 0.1
   update_interval: 100
   reference_loss: wss
+  physics_weight_floor: 0.1
 
 physics:
   mu: 0.0035
