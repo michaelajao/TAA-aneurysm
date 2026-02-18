@@ -206,35 +206,3 @@ def sample_interior_points_torch(x_wall: torch.Tensor,
     z_interior = torch.tensor(z_int.reshape(-1, 1), dtype=torch.float32, device=device)
 
     return x_interior, y_interior, z_interior
-
-
-def validate_normals(normals: np.ndarray) -> dict:
-    """
-    Validate computed normal vectors.
-
-    Args:
-        normals: (N, 3) array of normal vectors
-
-    Returns:
-        Dictionary of validation metrics
-    """
-    # Check unit length
-    norms = np.linalg.norm(normals, axis=1)
-
-    # Check consistency (neighboring normals should be similar)
-    # Simple check: std of normals should not be too high
-    normal_std = normals.std(axis=0)
-
-    metrics = {
-        'n_normals': len(normals),
-        'norm_min': norms.min(),
-        'norm_max': norms.max(),
-        'norm_mean': norms.mean(),
-        'norm_std': norms.std(),
-        'is_unit': np.allclose(norms, 1.0, atol=1e-3),
-        'normal_x_std': normal_std[0],
-        'normal_y_std': normal_std[1],
-        'normal_z_std': normal_std[2],
-    }
-
-    return metrics

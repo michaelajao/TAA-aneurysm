@@ -125,22 +125,26 @@ class Net2_nut(TAANet):
     """Network for non-dimensional turbulent viscosity nu_t_bar.
 
     Output is passed through softplus to guarantee nu_t >= 0.
-    The decoder bias is initialised so that the initial output is
-    approximately 10x the molecular viscosity (1/Re), giving the
-    physics loss something to work with from epoch 1.
-    """
 
-    def __init__(self, *args, initial_nut: float = 0.001, **kwargs):
+    Key design choice: the raw network output is SHIFTED by +2 before
+    softplus so the operating point is sigmoid(+2) ≈ 0.88 (gradient),
+    not sigmoid(−7) ≈ 0.001.  This prevents the vanishing-gradient
+    trap that previously caused nu_t to collapse to zero.
+
+    Initial output ≈ softplus(bias + 2) ≈ initial_nut.
+    """
+    SOFTPLUS_SHIFT = 2.0
+
+    def __init__(self, *args, initial_nut: float = 0.05, **kwargs):
         super().__init__(*args, **kwargs)
-        # Set decoder bias so softplus(bias) ≈ initial_nut.
-        # softplus^{-1}(y) = log(exp(y) - 1); for small y this is ≈ log(y).
         import math
-        bias_val = math.log(math.expm1(max(initial_nut, 1e-8)))
+        target_raw = math.log(math.expm1(max(initial_nut, 1e-8)))
+        bias_val = target_raw - self.SOFTPLUS_SHIFT
         nn.init.constant_(self.decoder.bias, bias_val)
 
     def forward(self, x):
         raw = super().forward(x)
-        return torch.nn.functional.softplus(raw)
+        return torch.nn.functional.softplus(raw + self.SOFTPLUS_SHIFT)
 
 
 def create_taa_networks(input_dim: int = 4,

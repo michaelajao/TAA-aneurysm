@@ -26,6 +26,9 @@ model:
   nut:
     hidden_dim: 64
     num_layers: 4
+    lr_multiplier: 10.0
+    reg_weight: 1.0
+    reg_target: 0.01
 
 training:
   batch_size: 4096
@@ -54,7 +57,17 @@ loss_weights:
   lambda_BC_noslip: 1.0
   lambda_WSS: 1.0
   lambda_pressure: 1.0
+  lambda_inlet: 10.0
+  lambda_outlet: 10.0
   physics_ramp_epochs: 0
+
+inlet_outlet:
+  enabled: true
+  n_radial: 6
+  n_angular: 12
+  inlet_velocity:
+    systolic: 0.5    # m/s (peak velocity from manuscript)
+    diastolic: 0.1   # m/s (minimum velocity from manuscript)
 
 adaptive_weights:
   enabled: true
@@ -62,6 +75,7 @@ adaptive_weights:
   update_interval: 100
   reference_loss: wss
   physics_weight_floor: 0.1
+  weight_cap: 20.0
 
 physics:
   mu: 0.0035

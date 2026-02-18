@@ -30,7 +30,9 @@ from src.models.networks import create_taa_networks, count_parameters
 from src.losses.wss import compute_wss_loss, compute_wss_metrics
 from src.losses.physics import compute_physics_loss
 from src.utils.plotting import process_geometry as generate_comparison_plots
-from src.losses.boundary import compute_noslip_loss, compute_pressure_loss
+from src.losses.boundary import (compute_noslip_loss, compute_pressure_loss,
+                                 detect_inlet_outlet, generate_cross_section_points,
+                                 compute_inlet_velocity_loss, compute_outlet_pressure_loss)
 
 
 class TAATrainer:
@@ -191,6 +193,58 @@ class TAATrainer:
             print(f"  Normals computed: {normals.shape}")
             print(f"  Phase encoding: {tensors['phase'][0].item()}")
 
+        # ── Generate inlet/outlet cross-section sample points ────────────
+        inlet_outlet_cfg = self.config.get('inlet_outlet', {})
+        if inlet_outlet_cfg.get('enabled', True):
+            first_phase = self.config['data']['phases'][0]
+            tensors0 = self.data[first_phase]
+            io_geom = detect_inlet_outlet(tensors0['x'], tensors0['y'], tensors0['z'])
+            self.io_geometry = io_geom
+
+            # Store inlet velocities from config (physical m/s)
+            inlet_vel = inlet_outlet_cfg.get('inlet_velocity', {})
+            self.inlet_vel_systolic = inlet_vel.get('systolic', 0.5)
+            self.inlet_vel_diastolic = inlet_vel.get('diastolic', 0.1)
+
+            axial_dim = io_geom['axial_dim']
+            L_ref = self.config['data']['normalization']['length_scale']
+            coord_scale = self.ref_scales.get('coord_scale', 1.0)
+
+            n_radial = inlet_outlet_cfg.get('n_radial', 6)
+            n_angular = inlet_outlet_cfg.get('n_angular', 12)
+
+            for label in ['inlet', 'outlet']:
+                # Generate points in PHYSICAL coordinates
+                x_io, y_io, z_io = generate_cross_section_points(
+                    io_geom[f'{label}_axial_pos'],
+                    io_geom[f'{label}_center'],
+                    io_geom[f'{label}_radius'],
+                    axial_dim,
+                    n_radial=n_radial,
+                    n_angular=n_angular,
+                    device='cpu',
+                )
+                n_io = x_io.shape[0]
+                phys_radius = io_geom[f'{label}_radius'] * coord_scale * L_ref
+                print(f"  {label.capitalize()} cross-section: {n_io} points, "
+                      f"radius={phys_radius*1000:.1f} mm")
+
+                for phase in self.config['data']['phases']:
+                    phase_val = 1.0 if phase == 'systolic' else 0.0
+                    t_io = torch.full((n_io, 1), phase_val,
+                                      dtype=torch.float32, device=self.device)
+                    self.data[phase][f'x_{label}'] = x_io.to(self.device)
+                    self.data[phase][f'y_{label}'] = y_io.to(self.device)
+                    self.data[phase][f'z_{label}'] = z_io.to(self.device)
+                    self.data[phase][f'phase_{label}'] = t_io
+
+            print(f"  Axial direction: {'XYZ'[axial_dim]}")
+            print(f"  Inlet velocity (physical): systolic={self.inlet_vel_systolic} m/s, "
+                  f"diastolic={self.inlet_vel_diastolic} m/s")
+        else:
+            self.io_geometry = None
+            print("  Inlet/outlet BCs: DISABLED")
+
         print(f"\nData loading complete!")
 
     def _resample_collocation_points(self):
@@ -275,38 +329,56 @@ class TAATrainer:
         print(f"  Total: {total_params:,} parameters")
 
     def _initialize_optimizers(self):
-        """Initialize a single AdamW optimizer over all network parameters.
+        """Initialize optimizers: one for the flow networks (u,v,w,p) and one
+        for the turbulent viscosity network (nut).
 
-        A coupled N-S system (u, v, w, p) must be optimised jointly so that
-        the physics loss can correctly couple the networks.  Separate per-network
-        optimisers break this coupling and can cause divergence.
+        Alternating optimisation: the flow optimizer updates u/v/w/p using all
+        losses; the nut optimizer updates net_nut using only the physics loss.
+        This ensures net_nut receives dedicated gradient signal to learn the
+        spatially-varying turbulent viscosity.
         """
         print("\n" + "-" * 70)
-        print("INITIALIZING OPTIMIZER")
+        print("INITIALIZING OPTIMIZERS")
         print("-" * 70)
 
         lr = self.config['training']['learning_rate']
-        print(f"Learning rate: {lr}")
+        nut_lr_mult = self.config['model'].get('nut', {}).get('lr_multiplier', 10.0)
+        nut_lr = lr * nut_lr_mult
+        print(f"Learning rate (flow): {lr}")
+        print(f"Learning rate (nut):  {nut_lr} ({nut_lr_mult}x)")
 
-        # Single optimizer over all four networks combined
-        all_params = []
-        for net in self.networks.values():
-            all_params += list(net.parameters())
+        flow_params = []
+        for name, net in self.networks.items():
+            if name != 'nut':
+                flow_params += list(net.parameters())
 
         self.optimizer = optim.AdamW(
-            all_params,
+            flow_params,
             lr=lr,
             betas=(0.9, 0.99),
             eps=1e-15,
             weight_decay=1e-4,
         )
 
-        # Single scheduler
+        nut_params = list(self.networks['nut'].parameters())
+        self.optimizer_nut = optim.AdamW(
+            nut_params,
+            lr=nut_lr,
+            betas=(0.9, 0.99),
+            eps=1e-15,
+            weight_decay=1e-5,
+        )
+
         sched_cfg = self.config['training']['scheduler']
         sched_type = sched_cfg['type']
         if sched_type == 'StepLR':
             self.scheduler = optim.lr_scheduler.StepLR(
                 self.optimizer,
+                step_size=sched_cfg['step_size'],
+                gamma=sched_cfg['gamma']
+            )
+            self.scheduler_nut = optim.lr_scheduler.StepLR(
+                self.optimizer_nut,
                 step_size=sched_cfg['step_size'],
                 gamma=sched_cfg['gamma']
             )
@@ -317,19 +389,31 @@ class TAATrainer:
                 T_mult=sched_cfg.get('T_mult', 2),
                 eta_min=sched_cfg.get('eta_min', 1e-7)
             )
+            self.scheduler_nut = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                self.optimizer_nut,
+                T_0=sched_cfg.get('T_0', 2000),
+                T_mult=sched_cfg.get('T_mult', 2),
+                eta_min=sched_cfg.get('eta_min', 1e-7)
+            )
         elif sched_type == 'CosineAnnealingLR':
             self.scheduler = optim.lr_scheduler.CosineAnnealingLR(
                 self.optimizer,
                 T_max=self.config['training']['epochs'],
                 eta_min=sched_cfg.get('eta_min', 1e-7)
             )
+            self.scheduler_nut = optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer_nut,
+                T_max=self.config['training']['epochs'],
+                eta_min=sched_cfg.get('eta_min', 1e-7)
+            )
         else:
             raise ValueError(f"Unknown scheduler type: {sched_type}")
 
-        total_params = sum(p.numel() for p in all_params if p.requires_grad)
-        print(f"Optimizer: AdamW (β=(0.9, 0.99), ε=1e-15, wd=1e-4)")
+        n_flow = sum(p.numel() for p in flow_params if p.requires_grad)
+        n_nut = sum(p.numel() for p in nut_params if p.requires_grad)
+        print(f"Optimizer (flow): AdamW — {n_flow:,} parameters")
+        print(f"Optimizer (nut):  AdamW — {n_nut:,} parameters")
         print(f"Scheduler: {sched_type}")
-        print(f"Total optimisable parameters: {total_params:,}")
 
         # AMP (Automatic Mixed Precision)
         self.use_amp = self.config['training'].get('use_amp', False)
@@ -440,23 +524,71 @@ class TAATrainer:
 
         loss_pressure = loss_pressure_total
 
+        # ── Inlet / Outlet BC Losses ──────────────────────────────────────
+        loss_inlet = torch.tensor(0.0, device=self.device)
+        loss_outlet = torch.tensor(0.0, device=self.device)
+
+        if self.io_geometry is not None:
+            U_ref = self.ref_scales['U_ref']
+            axial_dim = self.io_geometry['axial_dim']
+
+            # Inlet velocity BC
+            if f'x_inlet' in tensors:
+                if phase == 'systolic':
+                    v_inlet_nondim = self.inlet_vel_systolic / U_ref
+                else:
+                    v_inlet_nondim = self.inlet_vel_diastolic / U_ref
+
+                loss_inlet = compute_inlet_velocity_loss(
+                    self.networks['u'], self.networks['v'], self.networks['w'],
+                    tensors['x_inlet'], tensors['y_inlet'], tensors['z_inlet'],
+                    tensors['phase_inlet'],
+                    u_inlet_nondim=v_inlet_nondim,
+                    axial_dim=axial_dim,
+                )
+
+            # Outlet pressure BC (p = 0 → p_std = 0)
+            if f'x_outlet' in tensors:
+                loss_outlet = compute_outlet_pressure_loss(
+                    self.networks['p'],
+                    tensors['x_outlet'], tensors['y_outlet'], tensors['z_outlet'],
+                    tensors['phase_outlet'],
+                )
+
+        # ── ν_t regularization (prevents collapse to zero) ─────────────────
+        loss_nut_reg = torch.tensor(0.0, device=self.device)
+        nut_cfg = self.config['model'].get('nut', {})
+        nut_reg_weight = nut_cfg.get('reg_weight', 1.0)
+        nut_reg_target = nut_cfg.get('reg_target', 0.01)
+        if nut_reg_weight > 0:
+            net_in_int = torch.cat([
+                tensors['x_interior'], tensors['y_interior'],
+                tensors['z_interior'], tensors['phase_interior'],
+            ], dim=1)
+            nut_pred = self.networks['nut'](net_in_int).view(-1)
+            shortfall = torch.relu(nut_reg_target - nut_pred.mean())
+            loss_nut_reg = nut_reg_weight * shortfall ** 2
+
         # Keep live tensors for adaptive weight computation
         individual_losses = {
             'wss': loss_wss,
             'physics': loss_physics,
             'bc_noslip': loss_bc,
             'pressure': loss_pressure,
+            'inlet': loss_inlet,
+            'outlet': loss_outlet,
+            'nut_reg': loss_nut_reg,
         }
 
-        # Total weighted loss (with optional loss normalization and physics annealing)
-        # Physics annealing: ramp lambda_physics from 0 to full weight over ramp epochs
         lambda_physics = weights['lambda_physics']
         if self.physics_ramp_epochs > 0 and self.epoch > 0:
             ramp_factor = min(1.0, self.epoch / self.physics_ramp_epochs)
             lambda_physics = weights['lambda_physics'] * ramp_factor
 
+        lambda_inlet = weights.get('lambda_inlet', 10.0)
+        lambda_outlet = weights.get('lambda_outlet', 10.0)
+
         if self.adaptive_weights_enabled and self.adaptive_weights:
-            # Use gradient-norm-based adaptive weights (Wang et al. 2021)
             aw_physics = self.adaptive_weights.get('physics', 1.0)
             if self.physics_ramp_epochs > 0 and self.epoch > 0:
                 ramp_factor = min(1.0, self.epoch / self.physics_ramp_epochs)
@@ -465,21 +597,30 @@ class TAATrainer:
                 self.adaptive_weights.get('wss', 1.0) * loss_wss +
                 aw_physics * loss_physics +
                 self.adaptive_weights.get('bc_noslip', 1.0) * loss_bc +
-                self.adaptive_weights.get('pressure', 1.0) * loss_pressure
+                self.adaptive_weights.get('pressure', 1.0) * loss_pressure +
+                self.adaptive_weights.get('inlet', lambda_inlet) * loss_inlet +
+                self.adaptive_weights.get('outlet', lambda_outlet) * loss_outlet +
+                loss_nut_reg
             )
         elif self.loss_normalization and self.loss_norms:
             total_loss = (
                 weights['lambda_WSS'] * loss_wss / self.loss_norms.get('wss', 1.0) +
                 lambda_physics * loss_physics / self.loss_norms.get('physics', 1.0) +
                 weights['lambda_BC_noslip'] * loss_bc / self.loss_norms.get('bc_noslip', 1.0) +
-                weights['lambda_pressure'] * loss_pressure / self.loss_norms.get('pressure', 1.0)
+                weights['lambda_pressure'] * loss_pressure / self.loss_norms.get('pressure', 1.0) +
+                lambda_inlet * loss_inlet +
+                lambda_outlet * loss_outlet +
+                loss_nut_reg
             )
         else:
             total_loss = (
                 weights['lambda_WSS'] * loss_wss +
                 lambda_physics * loss_physics +
                 weights['lambda_BC_noslip'] * loss_bc +
-                weights['lambda_pressure'] * loss_pressure
+                weights['lambda_pressure'] * loss_pressure +
+                lambda_inlet * loss_inlet +
+                lambda_outlet * loss_outlet +
+                loss_nut_reg
             )
 
         # Loss dictionary for logging
@@ -489,6 +630,9 @@ class TAATrainer:
             'physics': loss_physics.item(),
             'bc_noslip': loss_bc.item(),
             'pressure': loss_pressure.item(),
+            'inlet': loss_inlet.item(),
+            'outlet': loss_outlet.item(),
+            'nut_reg': loss_nut_reg.item(),
             'residual_momentum_x': residuals['momentum_x'],
             'residual_momentum_y': residuals['momentum_y'],
             'residual_momentum_z': residuals['momentum_z'],
@@ -540,18 +684,77 @@ class TAATrainer:
             else:
                 self.adaptive_weights[name] = raw_weight
 
-        # Enforce floor on physics weight — essential for RANS with learnable
-        # nu_t, otherwise net_nut receives no gradient signal.
+        # Enforce floor on physics weight
         if self.physics_weight_floor > 0 and 'physics' in self.adaptive_weights:
             self.adaptive_weights['physics'] = max(
                 self.adaptive_weights['physics'], self.physics_weight_floor)
 
+        # Cap all weights to prevent over-weighting already-satisfied losses
+        aw_cap = self.config.get('adaptive_weights', {}).get('weight_cap', 20.0)
+        if aw_cap > 0:
+            for name in self.adaptive_weights:
+                self.adaptive_weights[name] = min(
+                    self.adaptive_weights[name], aw_cap)
+
+    def _compute_physics_only_loss(self, phase):
+        """Compute physics loss + ν_t regularization for the nut update step.
+
+        The regularization term penalizes ν_t values below a floor
+        (nut_reg_target), breaking the stable equilibrium at ν_t = 0
+        that the alternating optimization creates.
+        """
+        tensors = self.data[phase]
+        physics_cfg = self.config['physics']
+        interior_batch_size = physics_cfg.get('interior_batch_size', 500)
+        n_interior = tensors['x_interior'].shape[0]
+
+        loss_physics = torch.tensor(0.0, device=self.device)
+        nut_vals = []
+        for i in range(0, n_interior, interior_batch_size):
+            j = min(i + interior_batch_size, n_interior)
+            loss_batch, residuals_batch = compute_physics_loss(
+                self.networks['u'], self.networks['v'],
+                self.networks['w'], self.networks['p'],
+                self.networks['nut'],
+                tensors['x_interior'][i:j], tensors['y_interior'][i:j],
+                tensors['z_interior'][i:j], tensors['phase_interior'][i:j],
+                Re=self.Re,
+                coord_scale=self.ref_scales.get('coord_scale', 1.0),
+                pressure_std=self.ref_scales.get('pressure_std', 1.0),
+            )
+            loss_physics = loss_physics + loss_batch * (j - i) / n_interior
+
+        # ν_t lower-bound regularization: penalize mean(ν_t) < target
+        nut_cfg = self.config['model'].get('nut', {})
+        nut_reg_weight = nut_cfg.get('reg_weight', 1.0)
+        nut_reg_target = nut_cfg.get('reg_target', 0.01)
+
+        if nut_reg_weight > 0:
+            net_in = torch.cat([
+                tensors['x_interior'], tensors['y_interior'],
+                tensors['z_interior'], tensors['phase_interior'],
+            ], dim=1)
+            nut_pred = self.networks['nut'](net_in).view(-1)
+            nut_mean = nut_pred.mean()
+            shortfall = torch.relu(nut_reg_target - nut_mean)
+            loss_nut_reg = nut_reg_weight * shortfall ** 2
+            return loss_physics + loss_nut_reg
+
+        return loss_physics
+
     def train_epoch(self):
-        """Train for one epoch. Returns (avg_loss, list_of_loss_dicts)."""
+        """Train for one epoch using alternating optimisation.
+
+        Step 1: Update u/v/w/p using the full loss (WSS + physics + BC + pressure).
+        Step 2: Update net_nut using only the physics loss (dedicated gradient step).
+
+        This ensures net_nut receives meaningful gradient signal even when the
+        adaptive weights assign low priority to the physics loss.
+        """
         total_loss_sum = 0.0
         phase_dicts = []
+        grad_clip = self.config['training']['gradient_clip']
 
-        # Check whether to update adaptive weights this epoch
         should_update_aw = (
             self.adaptive_weights_enabled
             and self.epoch > 0
@@ -559,55 +762,40 @@ class TAATrainer:
         )
 
         for phase in self.config['data']['phases']:
-            # Zero gradients for all networks via the shared optimizer
+            # ── Step 1: Update flow networks (u, v, w, p) ────────────────
             self.optimizer.zero_grad(set_to_none=True)
 
-            # Compute loss (with AMP if enabled)
-            if self.use_amp:
-                with torch.amp.autocast('cuda'):
-                    total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
+            total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
 
-                # Update adaptive weights before backward (needs retain_graph)
-                if should_update_aw:
-                    self._compute_adaptive_weights(indiv)
-                    total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
-
-                self.scaler.scale(total_loss).backward()
-                if self.config['training']['gradient_clip'] > 0:
-                    self.scaler.unscale_(self.optimizer)
-                    all_params = [p for net in self.networks.values()
-                                  for p in net.parameters()]
-                    nn.utils.clip_grad_norm_(all_params, self.config['training']['gradient_clip'])
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-            else:
+            if should_update_aw:
+                self._compute_adaptive_weights(indiv)
                 total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
 
-                # Update adaptive weights before backward (needs retain_graph)
-                if should_update_aw:
-                    self._compute_adaptive_weights(indiv)
-                    total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
+            total_loss.backward()
+            if grad_clip > 0:
+                flow_params = [p for n, net in self.networks.items()
+                               if n != 'nut' for p in net.parameters()]
+                nn.utils.clip_grad_norm_(flow_params, grad_clip)
+            self.optimizer.step()
 
-                total_loss.backward()
-                if self.config['training']['gradient_clip'] > 0:
-                    all_params = [p for net in self.networks.values()
-                                  for p in net.parameters()]
-                    nn.utils.clip_grad_norm_(all_params, self.config['training']['gradient_clip'])
-                self.optimizer.step()
+            # ── Step 2: Update nut network (physics loss only) ────────────
+            self.optimizer_nut.zero_grad(set_to_none=True)
+            physics_loss = self._compute_physics_only_loss(phase)
+            physics_loss.backward()
+            if grad_clip > 0:
+                nut_params = list(self.networks['nut'].parameters())
+                nn.utils.clip_grad_norm_(nut_params, grad_clip)
+            self.optimizer_nut.step()
 
             total_loss_sum += loss_dict['total']
             phase_dicts.append(loss_dict)
 
         avg_loss = total_loss_sum / len(self.config['data']['phases'])
 
-        # Log adaptive weights update
         if should_update_aw and self.adaptive_weights:
             print(f"\n  Adaptive weights updated (epoch {self.epoch}): "
                   f"{', '.join(f'{k}={v:.4f}' for k, v in self.adaptive_weights.items())}")
 
-        # Initialize loss normalization on first epoch.
-        # Floor of 1e-4 prevents tiny denominators (e.g. BC loss -> 0 on
-        # training data) from inflating validation loss by orders of magnitude.
         _NORM_FLOOR = 1e-4
         if self.loss_normalization and not self.loss_norms and phase_dicts:
             avg_raw = {k: np.mean([d[k] for d in phase_dicts])
@@ -616,7 +804,6 @@ class TAATrainer:
                 self.loss_norms[k] = max(v, _NORM_FLOOR)
             print(f"\n  Loss normalization initialized: {self.loss_norms}")
 
-        # Periodic renormalization: update norms to current loss magnitudes
         if (self.loss_normalization and self.renorm_interval > 0
                 and self.loss_norms and self.epoch > 1
                 and self.epoch % self.renorm_interval == 0 and phase_dicts):
@@ -652,6 +839,8 @@ class TAATrainer:
             print(f"    Physics:  {loss_dict['physics']:.6f}")
             print(f"    BC:       {loss_dict['bc_noslip']:.6f}")
             print(f"    Pressure: {loss_dict['pressure']:.6f}")
+            print(f"    Inlet:    {loss_dict['inlet']:.6f}")
+            print(f"    Outlet:   {loss_dict['outlet']:.6f}")
 
             # Compute WSS metrics
             tensors = self.data[phase]
@@ -682,6 +871,8 @@ class TAATrainer:
                 "loss_physics": loss_dict['physics'],
                 "loss_bc_noslip": loss_dict['bc_noslip'],
                 "loss_pressure": loss_dict['pressure'],
+                "loss_inlet": loss_dict['inlet'],
+                "loss_outlet": loss_dict['outlet'],
                 "wss_relative_l2": metrics['relative_l2'],
                 "wss_correlation": metrics['correlation'],
                 "wss_mae": metrics['mae'],
@@ -701,7 +892,9 @@ class TAATrainer:
             'config': self.config,
             'networks': {name: net.state_dict() for name, net in self.networks.items()},
             'optimizer': self.optimizer.state_dict(),
+            'optimizer_nut': self.optimizer_nut.state_dict(),
             'scheduler': self.scheduler.state_dict(),
+            'scheduler_nut': self.scheduler_nut.state_dict(),
             'best_loss': self.best_loss,
             'loss_history': self.loss_history,
             'no_improve_count': self.no_improve_count,
@@ -734,18 +927,21 @@ class TAATrainer:
             else:
                 print(f"Warning: network '{name}' not in checkpoint; using fresh init.")
 
-        # Handle both checkpoint formats (single vs. per-network optimizer)
         if 'optimizer' in checkpoint:
-            self.optimizer.load_state_dict(checkpoint['optimizer'])
-        elif 'optimizers' in checkpoint:
-            print("Warning: checkpoint has legacy per-network optimizers; "
-                  "optimizer state not restored (fresh AdamW will be used).")
+            try:
+                self.optimizer.load_state_dict(checkpoint['optimizer'])
+            except (ValueError, KeyError):
+                print("Warning: flow optimizer state mismatch; using fresh init.")
+        if 'optimizer_nut' in checkpoint:
+            try:
+                self.optimizer_nut.load_state_dict(checkpoint['optimizer_nut'])
+            except (ValueError, KeyError):
+                print("Warning: nut optimizer state mismatch; using fresh init.")
 
         if 'scheduler' in checkpoint:
             self.scheduler.load_state_dict(checkpoint['scheduler'])
-        elif 'schedulers' in checkpoint:
-            print("Warning: checkpoint has legacy per-network schedulers; "
-                  "scheduler state not restored.")
+        if 'scheduler_nut' in checkpoint:
+            self.scheduler_nut.load_state_dict(checkpoint['scheduler_nut'])
 
         self.best_loss = checkpoint.get('best_loss', float('inf'))
         self.loss_history = checkpoint.get('loss_history', [])
@@ -813,8 +1009,11 @@ class TAATrainer:
 
         # Component losses
         for key, lbl in [("wss", "WSS"), ("physics", "Physics"),
-                          ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure")]:
-            axes[0, 1].semilogy(epochs, [r[key] for r in self.loss_history], label=lbl)
+                          ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure"),
+                          ("inlet", "Inlet BC"), ("outlet", "Outlet BC")]:
+            vals = [r.get(key, 0.0) for r in self.loss_history]
+            if any(v > 0 for v in vals):
+                axes[0, 1].semilogy(epochs, vals, label=lbl)
         axes[0, 1].set_title("Component Losses")
         axes[0, 1].set_xlabel("Epoch")
         axes[0, 1].set_ylabel("Loss")
@@ -841,7 +1040,8 @@ class TAATrainer:
         # Row 3: Gradient norms and adaptive weights (when available)
         if has_aw:
             for name, lbl in [("wss", "WSS"), ("physics", "Physics"),
-                               ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure")]:
+                               ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure"),
+                               ("inlet", "Inlet BC"), ("outlet", "Outlet BC")]:
                 vals = [r.get(f"grad_norm_{name}", float('nan'))
                         for r in self.loss_history]
                 valid = [(e, v) for e, v in zip(epochs, vals)
@@ -857,7 +1057,8 @@ class TAATrainer:
             axes[2, 0].grid(True, alpha=0.3)
 
             for name, lbl in [("wss", "WSS"), ("physics", "Physics"),
-                               ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure")]:
+                               ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure"),
+                               ("inlet", "Inlet BC"), ("outlet", "Outlet BC")]:
                 vals = [r.get(f"aw_{name}", float('nan'))
                         for r in self.loss_history]
                 valid = [(e, v) for e, v in zip(epochs, vals)
@@ -917,8 +1118,9 @@ class TAATrainer:
             # Train one epoch (returns cached loss dicts — no redundant forward passes)
             avg_loss, phase_dicts = self.train_epoch()
 
-            # Update learning rate scheduler
+            # Update learning rate schedulers
             self.scheduler.step()
+            self.scheduler_nut.step()
 
             lr = self.optimizer.param_groups[0]['lr']
 
@@ -932,6 +1134,8 @@ class TAATrainer:
                 "physics": avg_dict["physics"],
                 "bc_noslip": avg_dict["bc_noslip"],
                 "pressure": avg_dict["pressure"],
+                "inlet": avg_dict.get("inlet", 0.0),
+                "outlet": avg_dict.get("outlet", 0.0),
                 "res_mom_x": avg_dict["residual_momentum_x"],
                 "res_mom_y": avg_dict["residual_momentum_y"],
                 "res_mom_z": avg_dict["residual_momentum_z"],
@@ -943,7 +1147,7 @@ class TAATrainer:
 
             # Gradient norms and adaptive weights (populated on update epochs)
             if self.adaptive_weights_enabled:
-                for name in ['wss', 'physics', 'bc_noslip', 'pressure']:
+                for name in ['wss', 'physics', 'bc_noslip', 'pressure', 'inlet', 'outlet']:
                     history_entry[f"grad_norm_{name}"] = self._last_grad_norms.get(name, float('nan'))
                     history_entry[f"aw_{name}"] = self.adaptive_weights.get(name, float('nan'))
 
