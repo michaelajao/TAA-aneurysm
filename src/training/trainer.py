@@ -11,6 +11,7 @@ Integrates all components:
 
 import csv as csv_mod
 import os
+import sys
 import yaml
 import time
 import torch
@@ -70,11 +71,6 @@ class TAATrainer:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         print(f"Output directory: {self.output_dir}")
 
-        # Save configuration to output directory
-        config_save_path = self.output_dir / "config.yaml"
-        with open(config_save_path, 'w') as f:
-            yaml.dump(self.config, f)
-
         # Training state
         self.epoch = 0
         self.best_loss = float('inf')
@@ -100,6 +96,15 @@ class TAATrainer:
         self.early_stopping_patience = int(early_cfg.get('patience', 2000))
         self.early_stopping_min_delta = float(early_cfg.get('min_delta', 1e-6))
         self.no_improve_count = 0
+
+        # Adaptive weights: Wang et al. 2021 gradient-norm balancing
+        aw_cfg = self.config.get('adaptive_weights', {})
+        self.adaptive_weights_enabled = aw_cfg.get('enabled', False)
+        self.adaptive_weights_alpha = aw_cfg.get('alpha', 0.1)
+        self.adaptive_weights_update_interval = aw_cfg.get('update_interval', 100)
+        self.adaptive_weights_ref_loss = aw_cfg.get('reference_loss', 'wss')
+        self.adaptive_weights = {}  # {name: float} -- populated on first update
+        self._last_grad_norms = {}  # for logging: most recent per-loss grad norms
 
         # Initialize components (after all config attributes are set)
         self._load_data()
@@ -188,21 +193,58 @@ class TAATrainer:
         print(f"\nData loading complete!")
 
     def _resample_collocation_points(self):
-        """Re-sample interior collocation points for physics loss."""
+        """Re-sample interior collocation points for physics loss.
+
+        Supports partial replacement via ``physics.resample_fraction`` (0-1).
+        A fraction of 1.0 replaces all points (original behaviour); values
+        below 1.0 keep a random subset of existing points and only sample
+        fresh replacements for the remainder, preventing abrupt loss spikes.
+        """
+        fraction = self.config['physics'].get('resample_fraction', 1.0)
+
         for phase in self.config['data']['phases']:
             tensors = self.data[phase]
-            x_int, y_int, z_int = sample_interior_points_torch(
-                tensors['x'], tensors['y'], tensors['z'],
-                n_samples=self.config['physics']['n_interior_points'],
-                offset_range=self.config['physics']['interior_offset_range'],
-                normals=tensors['normals'],
-                seed=None,  # different points each time
-                device=self.device
-            )
+            n_total = self.config['physics']['n_interior_points']
+
+            if fraction >= 1.0:
+                # Full replacement (original behaviour)
+                x_int, y_int, z_int = sample_interior_points_torch(
+                    tensors['x'], tensors['y'], tensors['z'],
+                    n_samples=n_total,
+                    offset_range=self.config['physics']['interior_offset_range'],
+                    normals=tensors['normals'],
+                    seed=None,
+                    device=self.device
+                )
+            else:
+                n_keep = int(n_total * (1.0 - fraction))
+                n_new = n_total - n_keep
+
+                # Keep a random subset of existing points
+                perm = torch.randperm(tensors['x_interior'].shape[0],
+                                      device=self.device)[:n_keep]
+                x_keep = tensors['x_interior'][perm]
+                y_keep = tensors['y_interior'][perm]
+                z_keep = tensors['z_interior'][perm]
+
+                # Sample fresh points
+                x_new, y_new, z_new = sample_interior_points_torch(
+                    tensors['x'], tensors['y'], tensors['z'],
+                    n_samples=n_new,
+                    offset_range=self.config['physics']['interior_offset_range'],
+                    normals=tensors['normals'],
+                    seed=None,
+                    device=self.device
+                )
+
+                x_int = torch.cat([x_keep, x_new], dim=0)
+                y_int = torch.cat([y_keep, y_new], dim=0)
+                z_int = torch.cat([z_keep, z_new], dim=0)
+
             tensors['x_interior'] = x_int
             tensors['y_interior'] = y_int
             tensors['z_interior'] = z_int
-            tensors['phase_interior'] = tensors['phase'][:self.config['physics']['n_interior_points']]
+            tensors['phase_interior'] = tensors['phase'][:n_total]
 
     def _initialize_networks(self):
         """Initialize neural networks."""
@@ -295,7 +337,9 @@ class TAATrainer:
 
         Returns:
             total_loss: Total weighted loss
-            loss_dict: Dictionary of individual losses
+            loss_dict: Dictionary of individual losses (scalars)
+            wss_pred: Predicted WSS tensor
+            individual_losses: Dict of live loss tensors (for adaptive weights)
         """
         tensors = self.data[phase]
         weights = self.config['loss_weights']
@@ -380,6 +424,14 @@ class TAATrainer:
 
         loss_pressure = loss_pressure_total
 
+        # Keep live tensors for adaptive weight computation
+        individual_losses = {
+            'wss': loss_wss,
+            'physics': loss_physics,
+            'bc_noslip': loss_bc,
+            'pressure': loss_pressure,
+        }
+
         # Total weighted loss (with optional loss normalization and physics annealing)
         # Physics annealing: ramp lambda_physics from 0 to full weight over ramp epochs
         lambda_physics = weights['lambda_physics']
@@ -387,7 +439,19 @@ class TAATrainer:
             ramp_factor = min(1.0, self.epoch / self.physics_ramp_epochs)
             lambda_physics = weights['lambda_physics'] * ramp_factor
 
-        if self.loss_normalization and self.loss_norms:
+        if self.adaptive_weights_enabled and self.adaptive_weights:
+            # Use gradient-norm-based adaptive weights (Wang et al. 2021)
+            aw_physics = self.adaptive_weights.get('physics', 1.0)
+            if self.physics_ramp_epochs > 0 and self.epoch > 0:
+                ramp_factor = min(1.0, self.epoch / self.physics_ramp_epochs)
+                aw_physics = aw_physics * ramp_factor
+            total_loss = (
+                self.adaptive_weights.get('wss', 1.0) * loss_wss +
+                aw_physics * loss_physics +
+                self.adaptive_weights.get('bc_noslip', 1.0) * loss_bc +
+                self.adaptive_weights.get('pressure', 1.0) * loss_pressure
+            )
+        elif self.loss_normalization and self.loss_norms:
             total_loss = (
                 weights['lambda_WSS'] * loss_wss / self.loss_norms.get('wss', 1.0) +
                 lambda_physics * loss_physics / self.loss_norms.get('physics', 1.0) +
@@ -415,13 +479,60 @@ class TAATrainer:
             'residual_continuity': residuals['continuity']
         }
 
-        return total_loss, loss_dict, wss_pred
+        return total_loss, loss_dict, wss_pred, individual_losses
+
+    def _compute_adaptive_weights(self, individual_losses):
+        """Compute adaptive loss weights via gradient-norm balancing (Wang et al. 2021).
+
+        For each loss term L_i, compute the mean absolute gradient norm over all
+        network parameters.  The reference loss (default: WSS) provides the
+        max gradient norm.  The adaptive weight is:
+            lambda_hat_i = max|grad L_ref| / mean|grad L_i|
+        Smoothed with exponential moving average (EMA).
+
+        Args:
+            individual_losses: dict of live loss tensors {name: tensor}
+        """
+        all_params = [p for net in self.networks.values()
+                      for p in net.parameters() if p.requires_grad]
+
+        grad_norms = {}
+        for name, loss_val in individual_losses.items():
+            grads = torch.autograd.grad(
+                loss_val, all_params, retain_graph=True, allow_unused=True)
+            total = 0.0
+            count = 0
+            for g in grads:
+                if g is not None:
+                    total += g.abs().mean().item()
+                    count += 1
+            grad_norms[name] = total / max(count, 1)
+
+        self._last_grad_norms = dict(grad_norms)
+
+        ref_name = self.adaptive_weights_ref_loss
+        ref_max = grad_norms.get(ref_name, 1.0)
+
+        alpha = self.adaptive_weights_alpha
+        for name, gn in grad_norms.items():
+            raw_weight = ref_max / max(gn, 1e-12)
+            if name in self.adaptive_weights:
+                self.adaptive_weights[name] = (
+                    (1.0 - alpha) * self.adaptive_weights[name] + alpha * raw_weight)
+            else:
+                self.adaptive_weights[name] = raw_weight
 
     def train_epoch(self):
         """Train for one epoch. Returns (avg_loss, list_of_loss_dicts)."""
-        # Train on both phases
         total_loss_sum = 0.0
         phase_dicts = []
+
+        # Check whether to update adaptive weights this epoch
+        should_update_aw = (
+            self.adaptive_weights_enabled
+            and self.epoch > 0
+            and self.epoch % self.adaptive_weights_update_interval == 0
+        )
 
         for phase in self.config['data']['phases']:
             # Zero gradients
@@ -431,7 +542,14 @@ class TAATrainer:
             # Compute loss (with AMP if enabled)
             if self.use_amp:
                 with torch.amp.autocast('cuda'):
-                    total_loss, loss_dict, _ = self.compute_total_loss(phase)
+                    total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
+
+                # Update adaptive weights before backward (needs retain_graph)
+                if should_update_aw:
+                    self._compute_adaptive_weights(indiv)
+                    # Recompute total loss with updated weights
+                    total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
+
                 self.scaler.scale(total_loss).backward()
                 if self.config['training']['gradient_clip'] > 0:
                     for opt in self.optimizers.values():
@@ -445,7 +563,14 @@ class TAATrainer:
                     self.scaler.step(opt)
                 self.scaler.update()
             else:
-                total_loss, loss_dict, _ = self.compute_total_loss(phase)
+                total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
+
+                # Update adaptive weights before backward (needs retain_graph)
+                if should_update_aw:
+                    self._compute_adaptive_weights(indiv)
+                    # Recompute total loss with updated weights
+                    total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
+
                 total_loss.backward()
                 if self.config['training']['gradient_clip'] > 0:
                     for net in self.networks.values():
@@ -461,8 +586,13 @@ class TAATrainer:
 
         avg_loss = total_loss_sum / len(self.config['data']['phases'])
 
+        # Log adaptive weights update
+        if should_update_aw and self.adaptive_weights:
+            print(f"\n  Adaptive weights updated (epoch {self.epoch}): "
+                  f"{', '.join(f'{k}={v:.4f}' for k, v in self.adaptive_weights.items())}")
+
         # Initialize loss normalization on first epoch.
-        # Floor of 1e-4 prevents tiny denominators (e.g. BC loss → 0 on
+        # Floor of 1e-4 prevents tiny denominators (e.g. BC loss -> 0 on
         # training data) from inflating validation loss by orders of magnitude.
         _NORM_FLOOR = 1e-4
         if self.loss_normalization and not self.loss_norms and phase_dicts:
@@ -499,7 +629,7 @@ class TAATrainer:
             print(f"\n{phase.upper()}:")
 
             # Compute losses (gradients needed for WSS)
-            _, loss_dict, wss_pred = self.compute_total_loss(phase)
+            _, loss_dict, wss_pred, _ = self.compute_total_loss(phase)
 
             # Print losses
             print(f"  Losses:")
@@ -562,6 +692,7 @@ class TAATrainer:
             'renorm_interval': self.renorm_interval,
             'ref_scales': self.ref_scales,
             'Re': self.Re,
+            'adaptive_weights': self.adaptive_weights,
         }
 
         filepath = self.output_dir / filename
@@ -589,12 +720,16 @@ class TAATrainer:
         self.loss_history = checkpoint.get('loss_history', [])
         self.no_improve_count = checkpoint.get('no_improve_count', 0)
         self.loss_norms = checkpoint.get('loss_norms', {})
+        self.adaptive_weights = checkpoint.get('adaptive_weights', {})
         self.start_epoch = int(checkpoint['epoch']) + 1
         self.epoch = int(checkpoint['epoch'])
 
         print(f"Loaded checkpoint: {checkpoint_path}")
         print(f"Resuming from epoch: {self.start_epoch}")
         print(f"Best loss so far: {self.best_loss:.6f}")
+        if self.adaptive_weights:
+            print(f"Adaptive weights restored: "
+                  f"{', '.join(f'{k}={v:.4f}' for k, v in self.adaptive_weights.items())}")
 
     def _save_evaluation_metrics(self, eval_results):
         """Save evaluation metrics to CSV.
@@ -633,7 +768,10 @@ class TAATrainer:
 
         # --- PNG ---
         epochs = [r["epoch"] for r in self.loss_history]
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
+        has_aw = any("aw_wss" in r for r in self.loss_history)
+        n_rows = 3 if has_aw else 2
+        fig, axes = plt.subplots(n_rows, 2, figsize=(14, 5 * n_rows),
+                                 constrained_layout=True)
 
         # Total loss
         axes[0, 0].semilogy(epochs, [r["total"] for r in self.loss_history])
@@ -669,6 +807,40 @@ class TAATrainer:
         axes[1, 1].set_ylabel("LR")
         axes[1, 1].grid(True, alpha=0.3)
 
+        # Row 3: Gradient norms and adaptive weights (when available)
+        if has_aw:
+            for name, lbl in [("wss", "WSS"), ("physics", "Physics"),
+                               ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure")]:
+                vals = [r.get(f"grad_norm_{name}", float('nan'))
+                        for r in self.loss_history]
+                valid = [(e, v) for e, v in zip(epochs, vals)
+                         if v == v]  # filter NaN
+                if valid:
+                    ep, vv = zip(*valid)
+                    axes[2, 0].semilogy(ep, vv, label=lbl, marker='.', markersize=2,
+                                        linewidth=0.8)
+            axes[2, 0].set_title("Gradient Norms (per loss)")
+            axes[2, 0].set_xlabel("Epoch")
+            axes[2, 0].set_ylabel("Mean |grad|")
+            axes[2, 0].legend()
+            axes[2, 0].grid(True, alpha=0.3)
+
+            for name, lbl in [("wss", "WSS"), ("physics", "Physics"),
+                               ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure")]:
+                vals = [r.get(f"aw_{name}", float('nan'))
+                        for r in self.loss_history]
+                valid = [(e, v) for e, v in zip(epochs, vals)
+                         if v == v]
+                if valid:
+                    ep, vv = zip(*valid)
+                    axes[2, 1].semilogy(ep, vv, label=lbl, marker='.', markersize=2,
+                                        linewidth=0.8)
+            axes[2, 1].set_title("Adaptive Weights")
+            axes[2, 1].set_xlabel("Epoch")
+            axes[2, 1].set_ylabel("Weight")
+            axes[2, 1].legend()
+            axes[2, 1].grid(True, alpha=0.3)
+
         fig.suptitle(f"{self.config['experiment']['name']} — Training Curves", fontsize=14)
         fig.savefig(self.output_dir / "loss_curves.png", dpi=200)
         plt.close(fig)
@@ -699,7 +871,7 @@ class TAATrainer:
         start_time = time.time()
 
         pbar = tqdm(range(self.start_epoch, total_epochs + 1), desc="Training", unit="epoch",
-                    dynamic_ncols=True)
+                    dynamic_ncols=True, file=sys.stderr)
 
         for epoch in pbar:
             self.epoch = epoch
@@ -736,6 +908,13 @@ class TAATrainer:
                 "res_cont": avg_dict["residual_continuity"],
                 "lr": lr,
             }
+
+            # Gradient norms and adaptive weights (populated on update epochs)
+            if self.adaptive_weights_enabled:
+                for name in ['wss', 'physics', 'bc_noslip', 'pressure']:
+                    history_entry[f"grad_norm_{name}"] = self._last_grad_norms.get(name, float('nan'))
+                    history_entry[f"aw_{name}"] = self.adaptive_weights.get(name, float('nan'))
+
             self.loss_history.append(history_entry)
 
             # Update tqdm bar

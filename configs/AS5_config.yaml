@@ -1,5 +1,5 @@
 # Configuration for AS5 Geometry (5cm Axisymmetric TAA)
-# V4: full non-dimensionalization with Re-based physics formulation
+# Adaptive loss weights (Wang et al. 2021), smooth collocation resampling, physics ramp
 
 data:
   geometry: AS5
@@ -12,8 +12,7 @@ data:
     diastolic: 5cm diastolic.csv
   subsample_factor: 10
   normalization:
-    length_scale: 0.05  # L_ref (m) -- vessel diameter
-    # U_ref, P_ref, tau_ref, Re are auto-computed from data and fluid properties
+    length_scale: 0.05
 
 model:
   architecture: fourier_residual
@@ -29,40 +28,47 @@ training:
   batch_size: 4096
   wall_batch_size: 16000
   epochs: 10000
-  learning_rate: 0.0001
+  learning_rate: 0.00005
   scheduler:
     type: StepLR
-    step_size: 2000       # decay LR every 2000 epochs
-    gamma: 0.5            # halve LR at each step
+    step_size: 2000
+    gamma: 0.5
   gradient_clip: 1.0
   use_amp: false
-  loss_normalization: true
-  renorm_interval: 0          # fixed from epoch 1 (no re-scaling)
+  loss_normalization: false
+  renorm_interval: 0
   log_interval: 100
   save_interval: 2500
-  eval_interval: 500
+  eval_interval: 1000
   early_stopping:
     enabled: true
-    patience: 2000        # epochs without improvement
+    patience: 3000
     min_delta: 1.0e-6
-  output_dir: experiments/AS5_adaptive_physics/
+  output_dir: experiments/AS5/
 
 loss_weights:
-  lambda_physics: 1.0
-  lambda_BC_noslip: 20.0
-  lambda_WSS: 50.0
-  lambda_pressure: 10.0
-  physics_ramp_epochs: 0        # physics active from epoch 1 (normalization handles balance)
+  lambda_physics: 0.1
+  lambda_BC_noslip: 1.0
+  lambda_WSS: 1.0
+  lambda_pressure: 1.0
+  physics_ramp_epochs: 2000
+
+adaptive_weights:
+  enabled: true
+  alpha: 0.1
+  update_interval: 100
+  reference_loss: wss
 
 physics:
-  mu: 0.0035            # Pa.s (Carreau-Yasuda mu_inf -- Newtonian approximation)
-  rho: 1060.0           # kg/m^3 (blood density)
+  mu: 0.0035
+  rho: 1060.0
   n_interior_points: 4000
   interior_batch_size: 4000
   interior_offset_range:
   - 0.05
   - 0.5
-  resample_collocation_interval: 1000
+  resample_collocation_interval: 2000
+  resample_fraction: 0.5
 
 geometry:
   normal_estimation:
@@ -75,13 +81,10 @@ random_seed: 42
 evaluation:
   compute_wss_metrics: true
   compute_physics_residuals: true
-  export_vtk: true
-  vtk_interval: 2500
+  export_vtk: false
 
 experiment:
-  name: AS5_adaptive_physics
-  description: "Non-dimensional formulation: Re-based physics, auto-computed reference scales, blood properties"
+  name: AS5
+  description: "5cm Axisymmetric TAA — adaptive weights, smooth resampling, physics ramp"
   tags:
   - AS5
-  - adaptive_physics
-  - single-geometry
