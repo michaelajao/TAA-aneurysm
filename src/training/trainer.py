@@ -252,6 +252,7 @@ class TAATrainer:
         print("INITIALIZING NETWORKS")
         print("-" * 70)
 
+        nut_cfg = self.config['model'].get('nut', {})
         self.networks = create_taa_networks(
             input_dim=self.config['model']['input_dim'],
             hidden_dim=self.config['model']['hidden_dim'],
@@ -259,6 +260,8 @@ class TAATrainer:
             num_frequencies=self.config['model']['num_frequencies'],
             fourier_scale=self.config['model']['fourier_scale'],
             use_fourier=self.config['model']['use_fourier'],
+            nut_hidden_dim=nut_cfg.get('hidden_dim', 64),
+            nut_num_layers=nut_cfg.get('num_layers', 4),
             device=self.device
         )
 
@@ -271,53 +274,61 @@ class TAATrainer:
         print(f"  Total: {total_params:,} parameters")
 
     def _initialize_optimizers(self):
-        """Initialize optimizers and schedulers."""
+        """Initialize a single AdamW optimizer over all network parameters.
+
+        A coupled N-S system (u, v, w, p) must be optimised jointly so that
+        the physics loss can correctly couple the networks.  Separate per-network
+        optimisers break this coupling and can cause divergence.
+        """
         print("\n" + "-" * 70)
-        print("INITIALIZING OPTIMIZERS")
+        print("INITIALIZING OPTIMIZER")
         print("-" * 70)
 
         lr = self.config['training']['learning_rate']
         print(f"Learning rate: {lr}")
 
-        self.optimizers = {}
-        self.schedulers = {}
+        # Single optimizer over all four networks combined
+        all_params = []
+        for net in self.networks.values():
+            all_params += list(net.parameters())
 
-        for name, net in self.networks.items():
-            # Adam optimizer with settings from original PINN-wss
-            self.optimizers[name] = optim.Adam(
-                net.parameters(),
-                lr=lr,
-                betas=(0.9, 0.99),
-                eps=1e-15
+        self.optimizer = optim.AdamW(
+            all_params,
+            lr=lr,
+            betas=(0.9, 0.99),
+            eps=1e-15,
+            weight_decay=1e-4,
+        )
+
+        # Single scheduler
+        sched_cfg = self.config['training']['scheduler']
+        sched_type = sched_cfg['type']
+        if sched_type == 'StepLR':
+            self.scheduler = optim.lr_scheduler.StepLR(
+                self.optimizer,
+                step_size=sched_cfg['step_size'],
+                gamma=sched_cfg['gamma']
             )
+        elif sched_type == 'CosineAnnealingWarmRestarts':
+            self.scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                self.optimizer,
+                T_0=sched_cfg.get('T_0', 2000),
+                T_mult=sched_cfg.get('T_mult', 2),
+                eta_min=sched_cfg.get('eta_min', 1e-7)
+            )
+        elif sched_type == 'CosineAnnealingLR':
+            self.scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer,
+                T_max=self.config['training']['epochs'],
+                eta_min=sched_cfg.get('eta_min', 1e-7)
+            )
+        else:
+            raise ValueError(f"Unknown scheduler type: {sched_type}")
 
-            # Learning rate scheduler
-            sched_cfg = self.config['training']['scheduler']
-            sched_type = sched_cfg['type']
-            if sched_type == 'StepLR':
-                self.schedulers[name] = optim.lr_scheduler.StepLR(
-                    self.optimizers[name],
-                    step_size=sched_cfg['step_size'],
-                    gamma=sched_cfg['gamma']
-                )
-            elif sched_type == 'CosineAnnealingWarmRestarts':
-                self.schedulers[name] = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-                    self.optimizers[name],
-                    T_0=sched_cfg.get('T_0', 2000),
-                    T_mult=sched_cfg.get('T_mult', 2),
-                    eta_min=sched_cfg.get('eta_min', 1e-7)
-                )
-            elif sched_type == 'CosineAnnealingLR':
-                self.schedulers[name] = optim.lr_scheduler.CosineAnnealingLR(
-                    self.optimizers[name],
-                    T_max=self.config['training']['epochs'],
-                    eta_min=sched_cfg.get('eta_min', 1e-7)
-                )
-            else:
-                raise ValueError(f"Unknown scheduler type: {sched_type}")
-
-        print(f"Optimizer: Adam (β=(0.9, 0.99), ε=1e-15)")
-        print(f"Scheduler: {self.config['training']['scheduler']['type']}")
+        total_params = sum(p.numel() for p in all_params if p.requires_grad)
+        print(f"Optimizer: AdamW (β=(0.9, 0.99), ε=1e-15, wd=1e-4)")
+        print(f"Scheduler: {sched_type}")
+        print(f"Total optimisable parameters: {total_params:,}")
 
         # AMP (Automatic Mixed Precision)
         self.use_amp = self.config['training'].get('use_amp', False)
@@ -361,6 +372,7 @@ class TAATrainer:
                 tensors['phase'][i:end_idx],
                 tensors['wss_x'][i:end_idx], tensors['wss_y'][i:end_idx], tensors['wss_z'][i:end_idx],
                 tensors['normals'][i:end_idx],
+                coord_scale=self.ref_scales.get('coord_scale', 1.0),
             )
 
             loss_wss_total += loss_wss_batch * (end_idx - i) / n_wall_points
@@ -382,9 +394,12 @@ class TAATrainer:
 
             loss_physics_batch, residuals_batch = compute_physics_loss(
                 self.networks['u'], self.networks['v'], self.networks['w'], self.networks['p'],
+                self.networks['nut'],
                 tensors['x_interior'][i:end_idx], tensors['y_interior'][i:end_idx],
                 tensors['z_interior'][i:end_idx], tensors['phase_interior'][i:end_idx],
                 Re=self.Re,
+                coord_scale=self.ref_scales.get('coord_scale', 1.0),
+                pressure_std=self.ref_scales.get('pressure_std', 1.0),
             )
 
             loss_physics_total += loss_physics_batch * (end_idx - i) / n_interior_points
@@ -476,7 +491,9 @@ class TAATrainer:
             'residual_momentum_x': residuals['momentum_x'],
             'residual_momentum_y': residuals['momentum_y'],
             'residual_momentum_z': residuals['momentum_z'],
-            'residual_continuity': residuals['continuity']
+            'residual_continuity': residuals['continuity'],
+            'nut_mean': residuals.get('nut_mean', 0.0),
+            'nut_max': residuals.get('nut_max', 0.0),
         }
 
         return total_loss, loss_dict, wss_pred, individual_losses
@@ -535,9 +552,8 @@ class TAATrainer:
         )
 
         for phase in self.config['data']['phases']:
-            # Zero gradients
-            for opt in self.optimizers.values():
-                opt.zero_grad(set_to_none=True)
+            # Zero gradients for all networks via the shared optimizer
+            self.optimizer.zero_grad(set_to_none=True)
 
             # Compute loss (with AMP if enabled)
             if self.use_amp:
@@ -547,20 +563,15 @@ class TAATrainer:
                 # Update adaptive weights before backward (needs retain_graph)
                 if should_update_aw:
                     self._compute_adaptive_weights(indiv)
-                    # Recompute total loss with updated weights
                     total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
 
                 self.scaler.scale(total_loss).backward()
                 if self.config['training']['gradient_clip'] > 0:
-                    for opt in self.optimizers.values():
-                        self.scaler.unscale_(opt)
-                    for net in self.networks.values():
-                        nn.utils.clip_grad_norm_(
-                            net.parameters(),
-                            self.config['training']['gradient_clip']
-                        )
-                for opt in self.optimizers.values():
-                    self.scaler.step(opt)
+                    self.scaler.unscale_(self.optimizer)
+                    all_params = [p for net in self.networks.values()
+                                  for p in net.parameters()]
+                    nn.utils.clip_grad_norm_(all_params, self.config['training']['gradient_clip'])
+                self.scaler.step(self.optimizer)
                 self.scaler.update()
             else:
                 total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
@@ -568,18 +579,14 @@ class TAATrainer:
                 # Update adaptive weights before backward (needs retain_graph)
                 if should_update_aw:
                     self._compute_adaptive_weights(indiv)
-                    # Recompute total loss with updated weights
                     total_loss, loss_dict, _, indiv = self.compute_total_loss(phase)
 
                 total_loss.backward()
                 if self.config['training']['gradient_clip'] > 0:
-                    for net in self.networks.values():
-                        nn.utils.clip_grad_norm_(
-                            net.parameters(),
-                            self.config['training']['gradient_clip']
-                        )
-                for opt in self.optimizers.values():
-                    opt.step()
+                    all_params = [p for net in self.networks.values()
+                                  for p in net.parameters()]
+                    nn.utils.clip_grad_norm_(all_params, self.config['training']['gradient_clip'])
+                self.optimizer.step()
 
             total_loss_sum += loss_dict['total']
             phase_dicts.append(loss_dict)
@@ -655,6 +662,9 @@ class TAATrainer:
             print(f"    Momentum Y: {loss_dict['residual_momentum_y']:.6f}")
             print(f"    Momentum Z: {loss_dict['residual_momentum_z']:.6f}")
             print(f"    Continuity: {loss_dict['residual_continuity']:.6f}")
+            print(f"  Turbulent Viscosity (nu_t_bar):")
+            print(f"    Mean: {loss_dict['nut_mean']:.6f}")
+            print(f"    Max:  {loss_dict['nut_max']:.6f}")
 
             results.append({
                 "phase": phase,
@@ -683,8 +693,8 @@ class TAATrainer:
             'epoch': self.epoch,
             'config': self.config,
             'networks': {name: net.state_dict() for name, net in self.networks.items()},
-            'optimizers': {name: opt.state_dict() for name, opt in self.optimizers.items()},
-            'schedulers': {name: sch.state_dict() for name, sch in self.schedulers.items()},
+            'optimizer': self.optimizer.state_dict(),
+            'scheduler': self.scheduler.state_dict(),
             'best_loss': self.best_loss,
             'loss_history': self.loss_history,
             'no_improve_count': self.no_improve_count,
@@ -700,7 +710,11 @@ class TAATrainer:
         print(f"\nCheckpoint saved: {filepath}")
 
     def load_checkpoint(self, checkpoint_path):
-        """Load training checkpoint and resume state."""
+        """Load training checkpoint and resume state.
+
+        Supports both the current format (single 'optimizer'/'scheduler' keys)
+        and the legacy format ('optimizers'/'schedulers' dicts from per-network setup).
+        """
         checkpoint_path = Path(checkpoint_path)
         if not checkpoint_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
@@ -708,13 +722,23 @@ class TAATrainer:
         checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
 
         for name in self.networks:
-            self.networks[name].load_state_dict(checkpoint['networks'][name])
+            if name in checkpoint['networks']:
+                self.networks[name].load_state_dict(checkpoint['networks'][name])
+            else:
+                print(f"Warning: network '{name}' not in checkpoint; using fresh init.")
 
-        for name in self.optimizers:
-            self.optimizers[name].load_state_dict(checkpoint['optimizers'][name])
+        # Handle both checkpoint formats (single vs. per-network optimizer)
+        if 'optimizer' in checkpoint:
+            self.optimizer.load_state_dict(checkpoint['optimizer'])
+        elif 'optimizers' in checkpoint:
+            print("Warning: checkpoint has legacy per-network optimizers; "
+                  "optimizer state not restored (fresh AdamW will be used).")
 
-        for name in self.schedulers:
-            self.schedulers[name].load_state_dict(checkpoint['schedulers'][name])
+        if 'scheduler' in checkpoint:
+            self.scheduler.load_state_dict(checkpoint['scheduler'])
+        elif 'schedulers' in checkpoint:
+            print("Warning: checkpoint has legacy per-network schedulers; "
+                  "scheduler state not restored.")
 
         self.best_loss = checkpoint.get('best_loss', float('inf'))
         self.loss_history = checkpoint.get('loss_history', [])
@@ -886,11 +910,10 @@ class TAATrainer:
             # Train one epoch (returns cached loss dicts — no redundant forward passes)
             avg_loss, phase_dicts = self.train_epoch()
 
-            # Update learning rate schedulers
-            for scheduler in self.schedulers.values():
-                scheduler.step()
+            # Update learning rate scheduler
+            self.scheduler.step()
 
-            lr = self.optimizers['u'].param_groups[0]['lr']
+            lr = self.optimizer.param_groups[0]['lr']
 
             # Record loss history
             avg_dict = {k: np.mean([d[k] for d in phase_dicts])
@@ -906,6 +929,8 @@ class TAATrainer:
                 "res_mom_y": avg_dict["residual_momentum_y"],
                 "res_mom_z": avg_dict["residual_momentum_z"],
                 "res_cont": avg_dict["residual_continuity"],
+                "nut_mean": avg_dict.get("nut_mean", 0.0),
+                "nut_max": avg_dict.get("nut_max", 0.0),
                 "lr": lr,
             }
 
@@ -918,7 +943,7 @@ class TAATrainer:
             self.loss_history.append(history_entry)
 
             # Update tqdm bar
-            pbar.set_postfix(loss=f"{avg_loss:.4e}", lr=f"{lr:.1e}")
+            pbar.set_postfix(loss=f"{avg_loss:.4g}", lr=f"{lr:.2g}")
 
             # Detailed evaluation (metrics, residuals)
             if epoch % eval_interval == 0:
@@ -953,8 +978,7 @@ class TAATrainer:
         print("=" * 70)
         eval_results = self.evaluate()
 
-        # Save final model, loss curves, and evaluation metrics
-        self.save_checkpoint('final_model.pt')
+        # Save loss curves and evaluation metrics (best_model.pt already saved during training)
         self._save_loss_history()
         self._save_evaluation_metrics(eval_results)
 

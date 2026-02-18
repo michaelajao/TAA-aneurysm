@@ -1,8 +1,9 @@
 """
 Base neural network architectures for TAA-PINN
 
-Implements networks for velocity components (u, v, w) and pressure (p)
-with Fourier feature encoding and residual blocks.
+Implements networks for velocity components (u, v, w), pressure (p),
+and turbulent viscosity (nut) with Fourier feature encoding and
+residual blocks.
 """
 
 import torch
@@ -72,7 +73,7 @@ class TAANet(nn.Module):
         """Initialize network weights using Kaiming normal initialization."""
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight, nonlinearity='linear')
+                nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
@@ -120,33 +121,52 @@ class Net2_p(TAANet):
     pass
 
 
+class Net2_nut(TAANet):
+    """Network for non-dimensional turbulent viscosity nu_t_bar.
+
+    Output is passed through softplus to guarantee nu_t >= 0.
+    """
+
+    def forward(self, x):
+        raw = super().forward(x)
+        return torch.nn.functional.softplus(raw)
+
+
 def create_taa_networks(input_dim: int = 4,
                        hidden_dim: int = 256,
                        num_layers: int = 10,
                        num_frequencies: int = 32,
                        fourier_scale: float = 10.0,
                        use_fourier: bool = True,
+                       nut_hidden_dim: int = 64,
+                       nut_num_layers: int = 4,
                        device: str = 'cuda') -> dict:
     """
-    Create all four networks (u, v, w, p) for TAA-PINN.
+    Create all five networks (u, v, w, p, nut) for TAA-PINN.
+
+    The turbulent viscosity network (nut) uses a smaller architecture
+    because nu_t is a smoother field than velocity or pressure.
 
     Args:
         input_dim: Input dimension
-        hidden_dim: Hidden dimension
-        num_layers: Number of residual blocks
+        hidden_dim: Hidden dimension for u/v/w/p
+        num_layers: Number of residual blocks for u/v/w/p
         num_frequencies: Fourier frequencies
         fourier_scale: Fourier scale
         use_fourier: Use Fourier encoding
+        nut_hidden_dim: Hidden dimension for nut network
+        nut_num_layers: Number of residual blocks for nut network
         device: Device for networks
 
     Returns:
-        Dictionary with keys 'u', 'v', 'w', 'p' containing networks
+        Dictionary with keys 'u', 'v', 'w', 'p', 'nut' containing networks
     """
     networks = {
         'u': Net2_u(input_dim, hidden_dim, num_layers, num_frequencies, fourier_scale, use_fourier).to(device),
         'v': Net2_v(input_dim, hidden_dim, num_layers, num_frequencies, fourier_scale, use_fourier).to(device),
         'w': Net2_w(input_dim, hidden_dim, num_layers, num_frequencies, fourier_scale, use_fourier).to(device),
-        'p': Net2_p(input_dim, hidden_dim, num_layers, num_frequencies, fourier_scale, use_fourier).to(device)
+        'p': Net2_p(input_dim, hidden_dim, num_layers, num_frequencies, fourier_scale, use_fourier).to(device),
+        'nut': Net2_nut(input_dim, nut_hidden_dim, nut_num_layers, num_frequencies, fourier_scale, use_fourier).to(device),
     }
 
     return networks

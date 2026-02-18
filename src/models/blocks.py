@@ -23,9 +23,13 @@ class ResidualBlock(nn.Module):
     Residual block with skip connection for improved gradient flow.
 
     Architecture:
-        x -> Linear -> Activation -> Linear -> (+) -> Activation -> output
+        x -> Linear -> Activation -> Linear -> (+) -> output
         |___________________________________|
                     (skip connection)
+
+    No activation after the skip connection — this is the standard pre-activation
+    ResNet style: the activation is already applied inside the residual branch.
+    A second activation after the add would squash the skip path gradients.
     """
 
     def __init__(self,
@@ -47,8 +51,6 @@ class ResidualBlock(nn.Module):
             nn.Linear(dim, dim)
         )
 
-        self.activation = activation if isinstance(activation, nn.Module) else Swish()
-
     def forward(self, x):
         """
         Args:
@@ -58,9 +60,7 @@ class ResidualBlock(nn.Module):
             output: (N, dim) output tensor
         """
         residual = self.layer(x)
-        output = x + residual  # Skip connection
-        output = self.activation(output)
-        return output
+        return x + residual  # Skip connection — no extra activation
 
 
 class ResidualBlockWithNorm(nn.Module):
@@ -93,10 +93,7 @@ class ResidualBlockWithNorm(nn.Module):
         layers.append(nn.Linear(dim, dim))
 
         self.layer = nn.Sequential(*layers)
-        self.activation = activation if isinstance(activation, nn.Module) else Swish()
 
     def forward(self, x):
         residual = self.layer(x)
-        output = x + residual
-        output = self.activation(output)
-        return output
+        return x + residual  # No extra activation after skip connection

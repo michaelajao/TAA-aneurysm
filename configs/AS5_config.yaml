@@ -21,8 +21,11 @@ model:
   num_layers: 10
   use_fourier: true
   num_frequencies: 32
-  fourier_scale: 10.0
+  fourier_scale: 1.0
   device: cuda
+  nut:
+    hidden_dim: 64
+    num_layers: 4
 
 training:
   batch_size: 4096
@@ -67,7 +70,7 @@ physics:
   interior_offset_range:
   - 0.05
   - 0.5
-  resample_collocation_interval: 2000
+  resample_collocation_interval: 0
   resample_fraction: 0.5
 
 geometry:
@@ -85,6 +88,7 @@ evaluation:
 
 experiment:
   name: AS5
-  description: "5cm Axisymmetric TAA — adaptive weights, smooth resampling, physics ramp"
+  description: "5cm Axisymmetric TAA — RANS with learnable nu_t, adaptive weights"
   tags:
   - AS5
+  - RANS

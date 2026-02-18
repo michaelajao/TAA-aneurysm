@@ -25,36 +25,47 @@ import torch.nn as nn
 def compute_wss_loss(net_u, net_v, net_w,
                      x_wall, y_wall, z_wall, t_phase,
                      wss_x_true, wss_y_true, wss_z_true,
-                     normals):
+                     normals,
+                     coord_scale: float = 1.0):
     """
-    Compute WSS loss by matching non-dimensional velocity gradients at the wall.
+    Compute WSS loss by matching velocity gradients at the wall.
 
-    Both predicted and target WSS are in viscous-scaled non-dimensional units
-    (divided by tau_ref = mu * U_ref / L_ref), so the mu factor cancels.
+    Inputs are in STANDARDISED coordinates (x_std = x_bar / coord_scale).
+    Autograd gives du_bar/d(x_std) = coord_scale · du_bar/d(x_bar).
+
+    The non-dimensional (viscous-scaled) stress tensor is:
+        tau_bar_ij = du_bar_i/dx_bar_j + du_bar_j/dx_bar_i
+
+    In standardised coordinates this becomes:
+        tau_bar_ij = (1/coord_scale) · (du_bar_i/dx_std_j + du_bar_j/dx_std_i)
+
+    The targets wss_*_true are in standardised non-dim units:
+        tau_std = tau_bar / wss_std   (wss_std ≈ 43)
 
     Args:
-        net_u, net_v, net_w: Neural networks for non-dim velocity components
-        x_wall, y_wall, z_wall: Non-dim wall coordinates (N, 1) with requires_grad=True
-        t_phase: Cardiac phase (N, 1) tensor
-        wss_x_true, wss_y_true, wss_z_true: Non-dim ground truth WSS components (N, 1)
-        normals: Wall normal vectors (N, 3) pointing inward
+        net_u, net_v, net_w: Neural networks for non-dim velocity
+        x_wall, y_wall, z_wall: Standardised wall coordinates (N,1), x_std ∈ [-1,1]
+        t_phase:              Cardiac phase (N, 1)
+        wss_x_true, etc.:    Standardised WSS targets (N, 1)
+        normals:              Wall normal vectors (N, 3) pointing inward
+        coord_scale:          Factor to convert x_std → x_bar (i.e. x_bar = x_std*coord_scale)
 
     Returns:
-        loss: MSE loss between predicted and true WSS
-        wss_pred: Predicted WSS components (N, 3) for monitoring
+        loss:     MSE between predicted and true standardised WSS
+        wss_pred: Predicted standardised WSS components (N, 3) for monitoring
     """
     # Ensure gradients are enabled
     x_wall = x_wall.clone().detach().requires_grad_(True)
     y_wall = y_wall.clone().detach().requires_grad_(True)
     z_wall = z_wall.clone().detach().requires_grad_(True)
 
-    # Forward pass (non-dimensional outputs)
+    # Forward pass
     net_in = torch.cat((x_wall, y_wall, z_wall, t_phase), dim=1)
     u = net_u(net_in).view(-1, 1)
     v = net_v(net_in).view(-1, 1)
     w = net_w(net_in).view(-1, 1)
 
-    # Compute all velocity gradients (non-dimensional: du_bar/dx_bar)
+    # Velocity gradients w.r.t. x_std
     u_x = torch.autograd.grad(u, x_wall, grad_outputs=torch.ones_like(u),
                               create_graph=True, retain_graph=True)[0]
     u_y = torch.autograd.grad(u, y_wall, grad_outputs=torch.ones_like(u),
@@ -76,15 +87,17 @@ def compute_wss_loss(net_u, net_v, net_w,
     w_z = torch.autograd.grad(w, z_wall, grad_outputs=torch.ones_like(w),
                               create_graph=True, retain_graph=True)[0]
 
-    # Non-dimensional stress tensor (viscous scaling -- mu cancels)
-    # tau_bar_ij = du_bar_i/dx_bar_j + du_bar_j/dx_bar_i
-    tau_xx = 2.0 * u_x
-    tau_yy = 2.0 * v_y
-    tau_zz = 2.0 * w_z
+    # Non-dimensional stress tensor in x_bar coordinates:
+    #   tau_bar_ij = du_bar_i/dx_bar_j + du_bar_j/dx_bar_i
+    #              = (1/coord_scale) · (du_bar_i/dx_std_j + du_bar_j/dx_std_i)
+    inv_cs = 1.0 / coord_scale
+    tau_xx = 2.0 * u_x * inv_cs
+    tau_yy = 2.0 * v_y * inv_cs
+    tau_zz = 2.0 * w_z * inv_cs
 
-    tau_xy = u_y + v_x
-    tau_xz = u_z + w_x
-    tau_yz = v_z + w_y
+    tau_xy = (u_y + v_x) * inv_cs
+    tau_xz = (u_z + w_x) * inv_cs
+    tau_yz = (v_z + w_y) * inv_cs
 
     # Extract normal components
     n_x = normals[:, 0:1]
