@@ -8,7 +8,13 @@ Usage:
 """
 
 import argparse
+import sys
 import warnings
+
+# Force line-buffered stdout so all print() output is visible in log files
+# even when Python is not running in a TTY (e.g. nohup, & background).
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
 
 # Suppress harmless third-party library version warnings that appear at import time
 warnings.filterwarnings("ignore", message=".*numexpr.*")

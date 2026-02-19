@@ -53,13 +53,13 @@ training:
   output_dir: experiments/AS6/
 
 loss_weights:
-  lambda_physics: 0.001
+  lambda_physics: 0.01
   lambda_BC_noslip: 10.0
   lambda_WSS: 1.0
   lambda_pressure: 10.0
   lambda_inlet: 10.0
   lambda_outlet: 10.0
-  physics_ramp_epochs: 3000
+  physics_ramp_epochs: 0
 
 inlet_outlet:
   enabled: true
@@ -70,7 +70,12 @@ inlet_outlet:
     diastolic: 0.1
 
 adaptive_weights:
-  enabled: false
+  enabled: true
+  update_interval: 100
+  alpha: 0.9
+  ref_loss: wss
+  physics_weight_floor: 0.1
+  weight_cap: 20.0
 
 optimizer_strategy: adaptive_weights
 
@@ -82,7 +87,7 @@ physics:
   interior_offset_range:
   - 0.05
   - 0.5
-  resample_collocation_interval: 500
+  resample_collocation_interval: 0
   resample_fraction: 0.3
   non_newtonian:
     enabled: true
