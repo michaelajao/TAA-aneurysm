@@ -356,13 +356,10 @@ class TAADataLoader:
 
         all_data = {}
         for filename in csv_files:
-            try:
-                data = self.load_single_case(filename, subsample_factor)
-                key = (data['geometry'], data['phase_str'])
-                all_data[key] = data
-                print(f"Loaded {filename}: {data['n_points']} points")
-            except Exception as e:
-                print(f"Error loading {filename}: {e}")
+            data = self.load_single_case(filename, subsample_factor)
+            key = (data['geometry'], data['phase_str'])
+            all_data[key] = data
+            print(f"Loaded {filename}: {data['n_points']} points")
 
         return all_data
 

@@ -97,3 +97,4 @@ class GaussianFourierFeatures(nn.Module):
         x_proj = 2 * np.pi * self.scale * (x @ self.B)
 
         return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=-1)
+

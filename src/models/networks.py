@@ -124,27 +124,32 @@ class Net2_p(TAANet):
 class Net2_nut(TAANet):
     """Network for non-dimensional turbulent viscosity nu_t_bar.
 
-    Output is passed through softplus to guarantee nu_t >= 0.
+    Output is passed through softplus + a hard minimum floor to guarantee
+    nu_t >= nu_t_min at every point, eliminating the degenerate nu_t = 0
+    equilibrium that the physics loss can otherwise drive the network toward.
 
     Key design choice: the raw network output is SHIFTED by +2 before
     softplus so the operating point is sigmoid(+2) ≈ 0.88 (gradient),
     not sigmoid(−7) ≈ 0.001.  This prevents the vanishing-gradient
-    trap that previously caused nu_t to collapse to zero.
+    trap.  The additive floor then ensures a non-zero baseline.
 
-    Initial output ≈ softplus(bias + 2) ≈ initial_nut.
+    Output = softplus(raw + SOFTPLUS_SHIFT) + nu_t_min
+    Initial output ≈ softplus(bias + 2) + nu_t_min ≈ initial_nut + nu_t_min.
     """
     SOFTPLUS_SHIFT = 2.0
 
-    def __init__(self, *args, initial_nut: float = 0.05, **kwargs):
+    def __init__(self, *args, initial_nut: float = 0.05,
+                 nu_t_min: float = 0.001, **kwargs):
         super().__init__(*args, **kwargs)
         import math
+        self.nu_t_min = nu_t_min
         target_raw = math.log(math.expm1(max(initial_nut, 1e-8)))
         bias_val = target_raw - self.SOFTPLUS_SHIFT
         nn.init.constant_(self.decoder.bias, bias_val)
 
     def forward(self, x):
         raw = super().forward(x)
-        return torch.nn.functional.softplus(raw + self.SOFTPLUS_SHIFT)
+        return torch.nn.functional.softplus(raw + self.SOFTPLUS_SHIFT) + self.nu_t_min
 
 
 def create_taa_networks(input_dim: int = 4,
@@ -155,6 +160,7 @@ def create_taa_networks(input_dim: int = 4,
                        use_fourier: bool = True,
                        nut_hidden_dim: int = 64,
                        nut_num_layers: int = 4,
+                       nu_t_min: float = 0.001,
                        device: str = 'cuda') -> dict:
     """
     Create all five networks (u, v, w, p, nut) for TAA-PINN.
@@ -171,6 +177,7 @@ def create_taa_networks(input_dim: int = 4,
         use_fourier: Use Fourier encoding
         nut_hidden_dim: Hidden dimension for nut network
         nut_num_layers: Number of residual blocks for nut network
+        nu_t_min: Hard minimum floor for nu_t output (prevents degenerate zero solution)
         device: Device for networks
 
     Returns:
@@ -181,7 +188,8 @@ def create_taa_networks(input_dim: int = 4,
         'v': Net2_v(input_dim, hidden_dim, num_layers, num_frequencies, fourier_scale, use_fourier).to(device),
         'w': Net2_w(input_dim, hidden_dim, num_layers, num_frequencies, fourier_scale, use_fourier).to(device),
         'p': Net2_p(input_dim, hidden_dim, num_layers, num_frequencies, fourier_scale, use_fourier).to(device),
-        'nut': Net2_nut(input_dim, nut_hidden_dim, nut_num_layers, num_frequencies, fourier_scale, use_fourier).to(device),
+        'nut': Net2_nut(input_dim, nut_hidden_dim, nut_num_layers, num_frequencies, fourier_scale, use_fourier,
+                        nu_t_min=nu_t_min).to(device),
     }
 
     return networks

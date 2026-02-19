@@ -1,5 +1,5 @@
 # Configuration for AS5 Geometry (5cm Axisymmetric TAA)
-# Adaptive loss weights (Wang et al. 2021), smooth collocation resampling, physics ramp
+# Data-driven primary, physics as regularizer, reduced network for stability
 
 data:
   geometry: AS5
@@ -10,7 +10,7 @@ data:
   files:
     systolic: 5cm systolic.csv
     diastolic: 5cm diastolic.csv
-  subsample_factor: 10
+  subsample_factor: 3
   normalization:
     length_scale: 0.05
 
@@ -18,27 +18,27 @@ model:
   architecture: fourier_residual
   input_dim: 4
   hidden_dim: 128
-  num_layers: 10
+  num_layers: 6
   use_fourier: true
-  num_frequencies: 32
+  num_frequencies: 16
   fourier_scale: 1.0
   device: cuda
   nut:
     hidden_dim: 64
     num_layers: 4
     lr_multiplier: 10.0
-    reg_weight: 1.0
-    reg_target: 0.01
+    reg_weight: 100.0
+    reg_target: 0.05
+    nu_t_min: 0.001
 
 training:
   batch_size: 4096
   wall_batch_size: 16000
   epochs: 10000
-  learning_rate: 0.00005
+  learning_rate: 0.0001
   scheduler:
-    type: StepLR
-    step_size: 2000
-    gamma: 0.5
+    type: CosineAnnealingLR
+    eta_min: 1.0e-6
   gradient_clip: 1.0
   use_amp: false
   loss_normalization: false
@@ -53,40 +53,45 @@ training:
   output_dir: experiments/AS5/
 
 loss_weights:
-  lambda_physics: 0.1
-  lambda_BC_noslip: 1.0
+  lambda_physics: 0.001
+  lambda_BC_noslip: 10.0
   lambda_WSS: 1.0
-  lambda_pressure: 1.0
+  lambda_pressure: 10.0
   lambda_inlet: 10.0
   lambda_outlet: 10.0
-  physics_ramp_epochs: 0
+  physics_ramp_epochs: 3000
 
 inlet_outlet:
   enabled: true
   n_radial: 6
   n_angular: 12
   inlet_velocity:
-    systolic: 0.5    # m/s (peak velocity from manuscript)
-    diastolic: 0.1   # m/s (minimum velocity from manuscript)
+    systolic: 0.5
+    diastolic: 0.1
 
 adaptive_weights:
-  enabled: true
-  alpha: 0.1
-  update_interval: 100
-  reference_loss: wss
-  physics_weight_floor: 0.1
-  weight_cap: 20.0
+  enabled: false
+
+optimizer_strategy: adaptive_weights
 
 physics:
   mu: 0.0035
   rho: 1060.0
-  n_interior_points: 4000
-  interior_batch_size: 4000
+  n_interior_points: 6000
+  interior_batch_size: 3000
   interior_offset_range:
   - 0.05
   - 0.5
-  resample_collocation_interval: 0
-  resample_fraction: 0.5
+  resample_collocation_interval: 500
+  resample_fraction: 0.3
+  non_newtonian:
+    enabled: true
+    model: carreau_yasuda
+    mu_inf: 0.0035
+    mu_0: 0.16
+    lambda: 8.2
+    n: 0.2128
+    a: 0.64
 
 geometry:
   normal_estimation:
@@ -103,7 +108,7 @@ evaluation:
 
 experiment:
   name: AS5
-  description: "5cm Axisymmetric TAA — RANS with learnable nu_t, adaptive weights"
+  description: "5cm Axisymmetric TAA — data-driven RANS with physics regularization"
   tags:
   - AS5
   - RANS
