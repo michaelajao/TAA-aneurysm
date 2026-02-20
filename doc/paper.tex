@@ -403,34 +403,47 @@ Figure~\ref{fig:loss_schematic} provides an overview of how the individual losse
         \node[optbox, fill=green!8] (flowopt) at (-2.0, -1.15) {Flow Optimiser ($u,v,w,p$)};
         \node[optbox, fill=blue!8]  (nutopt)  at ( 2.3, -1.15) {$\nu_t$ Optimiser};
 
-        % Grouped routing points (reduces clutter)
-        \coordinate (hubL) at (-1.9, 0.85);
-        \coordinate (hubC) at ( 0.0, 0.92);
-        \coordinate (hubR) at ( 1.9, 0.85);
+        % ---- Grey arrows: all seven losses → L_total ----
 
-        % Routing to total loss
-        \draw[thinArrow] (Lwss.south)  -- (hubL);
-        \draw[thinArrow] (Lp.south)    -- (hubL);
-        \draw[thinArrow] (Lwall.south) -- (hubC);
-        \draw[thinArrow] (Lin.south)   -- (hubR);
-        \draw[thinArrow] (Lout.south)  -- (hubR);
-        \draw[thinArrow] (Lphys.south) -- (hubC);
-        \draw[thinArrow] (Lnut.south)  -- (hubC);
-
+        % Left hub centred between WSS and p (symmetric V-shape)
+        \coordinate (hubL) at (-3.15, 1.55);
+        \draw[thinArrow] (Lwss.south) -- (hubL);
+        \draw[thinArrow] (Lp.south)   -- (hubL);
         \draw[thinArrow] (hubL) -- (Ltotal.north west);
-        \draw[thinArrow] (hubC) -- (Ltotal.north);
+
+        % Wall routes straight down to L_total centre
+        \draw[thinArrow] (Lwall.south) -- (Ltotal.north);
+
+        % Right hub centred between inlet and outlet
+        \coordinate (hubR) at (3.15, 1.55);
+        \draw[thinArrow] (Lin.south)  -- (hubR);
+        \draw[thinArrow] (Lout.south) -- (hubR);
         \draw[thinArrow] (hubR) -- (Ltotal.north east);
 
-        % Optimiser update paths
-        \draw[arrow] (Ltotal.south) -- (flowopt.north);
-        \draw[arrow, blue!60] (Lphys.east) -- ++(2.8,0) -- ++(0,-2.05) -- (nutopt.north east);
-        \draw[arrow, blue!60] (Lnut.east)  -- ++(1.1,0) -- ++(0,-2.05) -- (nutopt.north west);
+        % Physics and ν_t route near-vertically to offset points on L_total
+        \draw[thinArrow] (Lphys.south) -- ([xshift=-1.0cm]Ltotal.north);
+        \draw[thinArrow] (Lnut.south)  -- ([xshift= 1.0cm]Ltotal.north);
 
-        % Labels and legend
-        \node[font=\scriptsize, gray]    at (-3.4, -0.55) {all losses};
-        \node[font=\scriptsize, blue!60] at ( 4.05, -0.55) {physics only};
-        \node[font=\scriptsize, red!70]    at (-5.1, 2.65) {data};
-        \node[font=\scriptsize, orange!70] at ( 3.35, 2.65) {BCs};
+        % ---- Black arrow: L_total → Flow Optimiser (all losses) ----
+        \draw[arrow] (Ltotal.south) -- (flowopt.north);
+
+        % ---- Blue arrows: L_physics + L_ν_t → ν_t Optimiser ----
+        % Routed along the right margin to clearly show the bypass path.
+        % L_physics: up from north, right across gap between rows, down to junction
+        \draw[semithick, blue!60] (Lphys.north) |- (5.0, 1.72);
+        \draw[semithick, blue!60] (5.0, 1.72) -- (5.0, 1.25);
+        % L_ν_t: east, straight across to junction
+        \draw[semithick, blue!60] (Lnut.east) -- (5.0, 1.25);
+        % Junction dot where the two paths merge
+        \fill[blue!60] (5.0, 1.25) circle (2pt);
+        % Shared descent to ν_t Optimiser
+        \draw[arrow, blue!60] (5.0, 1.25) -- (5.0, -1.15) -- (nutopt.east);
+
+        % Labels
+        \node[font=\scriptsize, gray]                    at (-1.5, -0.55) {all losses};
+        \node[font=\scriptsize, blue!60, rotate=-90]     at (5.35, 0.0)   {physics only};
+        \node[font=\scriptsize, red!70]                  at (-5.1, 2.65)  {data};
+        \node[font=\scriptsize, orange!70]               at ( 3.35, 2.65) {BCs};
 \end{tikzpicture}
 \caption{Loss composition and dual-optimiser routing. Data terms (WSS, pressure) and boundary terms (no-slip, inlet, outlet) are combined with the physics residual and $\nu_t$ regularisation via adaptive weights. All terms flow to the flow optimiser that updates $u,v,w,p$; only the physics loss and $\nu_t$ regularisation update the turbulent viscosity network.}
 \label{fig:loss_schematic}
@@ -506,51 +519,65 @@ Figure~\ref{fig:collocation} illustrates the collocation point generation proced
   % Vessel wall (curved)
   \draw[thick, blue!60] plot[smooth, tension=0.8] coordinates {(-3,0) (-2,0.8) (-0.5,1.5) (1,1.8) (2.5,1.2) (3.5,0.3)};
   \draw[thick, blue!60] plot[smooth, tension=0.8] coordinates {(-3,-0.5) (-2,-1.0) (-0.5,-1.6) (1,-1.9) (2.5,-1.4) (3.5,-0.5)};
-  \node[font=\scriptsize, blue!70] at (4.0,0.6) {wall $\Gamma$};
-  \node[font=\scriptsize, blue!70] at (4.0,-0.8) {wall $\Gamma$};
+  \node[font=\scriptsize, blue!70, right] at (3.6,0.3) {wall $\Gamma$};
+  \node[font=\scriptsize, blue!70, right] at (3.6,-0.5) {wall $\Gamma$};
 
   % Wall points (dots on the wall)
   \foreach \x/\y in {-2/0.8, -0.5/1.5, 1/1.8, 2.5/1.2, -2/-1.0, -0.5/-1.6, 1/-1.9, 2.5/-1.4} {
     \fill[blue!70] (\x,\y) circle (1.5pt);
   }
 
-  % Normal arrows + offset points (upper wall)
-  \draw[-Stealth, red!60, thick] (-2,0.8) -- (-2,0.15);
-  \fill[red!80] (-2,0.35) circle (2pt);
+  % Normal arrows + collocation points (upper wall).
+  % Each inward normal is perpendicular to the local curve tangent,
+  % estimated by central differences between neighbouring control points,
+  % then rotated 90 degrees clockwise so it points into the vessel lumen.
 
-  \draw[-Stealth, red!60, thick] (-0.5,1.5) -- (-0.5,0.7);
-  \fill[red!80] (-0.5,0.95) circle (2pt);
+  % (-2, 0.8): tangent ~ (1.25, 0.75), unit inward normal ~ (0.51, -0.86)
+  \draw[-Stealth, red!60, thick] (-2,0.8) -- (-1.64,0.20);
+  \fill[red!80] (-1.82,0.50) circle (2pt);
 
-  \draw[-Stealth, red!60, thick] (1,1.8) -- (1,0.9);
-  \fill[red!80] (1,1.2) circle (2pt);
+  % (-0.5, 1.5): tangent ~ (1.50, 0.50), unit inward normal ~ (0.32, -0.95)
+  \draw[-Stealth, red!60, thick] (-0.5,1.5) -- (-0.28,0.84);
+  \fill[red!80] (-0.39,1.17) circle (2pt);
 
-  \draw[-Stealth, red!60, thick] (2.5,1.2) -- (2.5,0.5);
-  \fill[red!80] (2.5,0.7) circle (2pt);
+  % (1, 1.8): tangent ~ (1.50, -0.15), unit inward normal ~ (-0.10, -1.00)
+  \draw[-Stealth, red!60, thick] (1,1.8) -- (0.93,1.10);
+  \fill[red!80] (0.97,1.45) circle (2pt);
 
-  % Normal arrows + offset points (lower wall)
-  \draw[-Stealth, red!60, thick] (-2,-1.0) -- (-2,-0.3);
-  \fill[red!80] (-2,-0.55) circle (2pt);
+  % (2.5, 1.2): tangent ~ (1.25, -0.75), unit inward normal ~ (-0.51, -0.86)
+  \draw[-Stealth, red!60, thick] (2.5,1.2) -- (2.14,0.60);
+  \fill[red!80] (2.32,0.90) circle (2pt);
 
-  \draw[-Stealth, red!60, thick] (-0.5,-1.6) -- (-0.5,-0.8);
-  \fill[red!80] (-0.5,-1.1) circle (2pt);
+  % Normal arrows + collocation points (lower wall).
+  % Inward normals rotated 90 degrees counter-clockwise to point up into the lumen.
 
-  \draw[-Stealth, red!60, thick] (1,-1.9) -- (1,-1.0);
-  \fill[red!80] (1,-1.35) circle (2pt);
+  % (-2, -1.0): tangent ~ (1.25, -0.55), unit inward normal ~ (0.40, 0.92)
+  \draw[-Stealth, red!60, thick] (-2,-1.0) -- (-1.72,-0.36);
+  \fill[red!80] (-1.86,-0.68) circle (2pt);
 
-  \draw[-Stealth, red!60, thick] (2.5,-1.4) -- (2.5,-0.7);
-  \fill[red!80] (2.5,-0.95) circle (2pt);
+  % (-0.5, -1.6): tangent ~ (1.50, -0.45), unit inward normal ~ (0.29, 0.96)
+  \draw[-Stealth, red!60, thick] (-0.5,-1.6) -- (-0.30,-0.93);
+  \fill[red!80] (-0.40,-1.27) circle (2pt);
+
+  % (1, -1.9): tangent ~ (1.50, 0.10), unit inward normal ~ (-0.07, 1.00)
+  \draw[-Stealth, red!60, thick] (1,-1.9) -- (0.95,-1.20);
+  \fill[red!80] (0.98,-1.55) circle (2pt);
+
+  % (2.5, -1.4): tangent ~ (1.25, 0.70), unit inward normal ~ (-0.49, 0.87)
+  \draw[-Stealth, red!60, thick] (2.5,-1.4) -- (2.16,-0.79);
+  \fill[red!80] (2.33,-1.09) circle (2pt);
 
   % Legend
   \fill[blue!70] (-3.5,-2.5) circle (1.5pt);
   \node[font=\scriptsize, right] at (-3.3,-2.5) {Wall point};
-  \draw[-Stealth, red!60, thick] (-1.5,-2.5) -- (-1.0,-2.5);
-  \node[font=\scriptsize, right] at (-0.9,-2.5) {Inward normal};
-  \fill[red!80] (1.2,-2.5) circle (2pt);
-  \node[font=\scriptsize, right] at (1.4,-2.5) {Collocation point};
+  \draw[-Stealth, red!60, thick] (-1.7,-2.5) -- (-1.2,-2.5);
+  \node[font=\scriptsize, right] at (-1.1,-2.5) {Inward normal};
+  \fill[red!80] (1.5,-2.5) circle (2pt);
+  \node[font=\scriptsize, right] at (1.7,-2.5) {Collocation point};
 
-  % Offset annotation
-  \draw[<->, gray, thin] (1.15,1.8) -- (1.15,1.2);
-  \node[font=\scriptsize, gray, right] at (1.2,1.5) {offset};
+  % Offset annotation (shown at upper peak where normal is nearly vertical)
+  \draw[<->, gray, thin] (1.15,1.78) -- (1.11,1.43);
+  \node[font=\scriptsize, gray, right] at (1.16,1.61) {offset};
 \end{tikzpicture}
 \caption{Interior collocation point generation. Wall surface points (blue) are displaced inward along estimated normals (red arrows) by a random offset in $[0.05, 0.5]$ (normalised coordinates), producing collocation points (red dots) concentrated in the near-wall boundary layer where velocity gradients are steepest.}
 \label{fig:collocation}
