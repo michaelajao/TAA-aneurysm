@@ -32,15 +32,13 @@ Thumbs.db
 # Jupyter
 .ipynb_checkpoints/
 
-# # latex
-# doc/
-# doc/*.pdf
-# doc/*.tex
-# doc/*.aux
-# doc/*.log
-# doc/*.out
-# doc/*.toc
-# doc/*.bbl
-# doc/*.blg
-# doc/*.fls
-# doc/*.fdb_latexmk
+# latex
+doc/*.pdf
+doc/*.aux
+doc/*.log
+doc/*.out
+doc/*.toc
+doc/*.bbl
+doc/*.blg
+doc/*.fls
+doc/*.fdb_latexmk
