@@ -1191,8 +1191,45 @@ class TAATrainer:
         fig2.savefig(self.output_dir / "loss_curves_1x2.png", dpi=300)
         plt.close(fig2)
 
+        # --- PNG 3: 1x2 (Gradient Norms, Adaptive Weights) ---
+        has_aw = any("aw_wss" in r for r in self.loss_history)
+        if has_aw:
+            fig3, axes3 = plt.subplots(1, 2, figsize=(14, 5), constrained_layout=True)
+            
+            for name, lbl in [("wss", "WSS"), ("physics", "Physics"),
+                               ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure"),
+                               ("inlet", "Inlet BC"), ("outlet", "Outlet BC")]:
+                vals = [r.get(f"grad_norm_{name}", float('nan')) for r in self.loss_history]
+                valid = [(e, v) for e, v in zip(epochs, vals) if v == v]
+                if valid:
+                    ep, vv = zip(*valid)
+                    axes3[0].semilogy(ep, vv, label=lbl, marker='.', markersize=2, linewidth=0.8)
+            axes3[0].set_title("Gradient Norms (per loss)")
+            axes3[0].set_xlabel("Epoch")
+            axes3[0].set_ylabel("Mean |grad|")
+            axes3[0].legend()
+            axes3[0].grid(True, alpha=0.3)
+
+            for name, lbl in [("wss", "WSS"), ("physics", "Physics"),
+                               ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure"),
+                               ("inlet", "Inlet BC"), ("outlet", "Outlet BC")]:
+                vals = [r.get(f"aw_{name}", float('nan')) for r in self.loss_history]
+                valid = [(e, v) for e, v in zip(epochs, vals) if v == v]
+                if valid:
+                    ep, vv = zip(*valid)
+                    axes3[1].semilogy(ep, vv, label=lbl, marker='.', markersize=2, linewidth=0.8)
+            axes3[1].set_title("Adaptive Weights")
+            axes3[1].set_xlabel("Epoch")
+            axes3[1].set_ylabel("Weight")
+            axes3[1].legend()
+            axes3[1].grid(True, alpha=0.3)
+            
+            fig3.suptitle(f"{self.config['experiment']['name']} — Adaptive Constraints", fontsize=14)
+            fig3.savefig(self.output_dir / "loss_curves_adaptive_1x2.png", dpi=300)
+            plt.close(fig3)
+
         print(f"Loss history saved: {csv_path}")
-        print(f"Loss curves saved:  {self.output_dir / 'loss_curves_2x1.png'} and loss_curves_1x2.png")
+        print(f"Loss curves saved:  {self.output_dir / 'loss_curves_2x1.png'}, 1x2, and adaptive.")
 
     def train(self):
         """Main training loop.
