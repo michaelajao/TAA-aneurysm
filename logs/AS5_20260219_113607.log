@@ -1,212 +1,0 @@
-======================================================================
-TAA-PINN TRAINING
-======================================================================
-
-Experiment: AS5
-Description: 5cm Axisymmetric TAA — data-driven RANS with physics regularization
-Geometry: AS5
-Device: cuda
-Output directory: experiments/AS5
-
-Non-Newtonian viscosity: Carreau-Yasuda
-  mu_inf=0.0035, mu_0=0.16, lambda=8.2, n=0.2128, a=0.64
-Optimizer strategy: adaptive weights
-
-----------------------------------------------------------------------
-LOADING DATA (non-dimensional)
-----------------------------------------------------------------------
-
-  Non-dimensional reference scales:
-    L_ref         = 0.0500 m
-    U_ref         = 0.6196 m/s  (from max|p|=406.96 Pa)
-    P_ref         = 406.96 Pa  (= rho * U_ref^2)
-    tau_ref       = 0.043373 Pa  (= mu * U_ref / L_ref)
-    Re            = 9382.8
-    rho           = 1060.0 kg/m^3
-    mu            = 0.003500 Pa.s
-    coord_scale   = 2.3062  (normalises coords to [-1,1])
-    wss_std       = 42.8493  (standardises WSS to O(1))
-    pressure_std  = 0.2936  (standardises pressure to O(1))
-
-Loading systolic: 5cm systolic.csv
-Computing wall normals...
-Sampling interior collocation points...
-  Wall points: 23615
-  Interior points: 6000
-  Normals computed: torch.Size([23615, 3])
-  Phase encoding: 1.0
-
-Loading diastolic: 5cm diastolic.csv
-Computing wall normals...
-Sampling interior collocation points...
-  Wall points: 23615
-  Interior points: 6000
-  Normals computed: torch.Size([23615, 3])
-  Phase encoding: 0.0
-  Inlet cross-section: 73 points, radius=5.8 mm
-  Outlet cross-section: 73 points, radius=10.0 mm
-  Axial direction: X
-  Inlet velocity (physical): systolic=0.5 m/s, diastolic=0.1 m/s
-
-Data loading complete!
-
-----------------------------------------------------------------------
-INITIALIZING NETWORKS
-----------------------------------------------------------------------
-  Net_u: 202,497 parameters
-  Net_v: 202,497 parameters
-  Net_w: 202,497 parameters
-  Net_p: 202,497 parameters
-  Net_nut: 35,457 parameters
-  Total: 845,445 parameters
-
-----------------------------------------------------------------------
-INITIALIZING OPTIMIZERS
-----------------------------------------------------------------------
-Learning rate (flow): 0.0001
-Learning rate (nut):  0.001 (10.0x)
-Optimizer (flow): AdamW — 809,988 parameters
-Optimizer (nut):  AdamW — 35,457 parameters
-Scheduler: CosineAnnealingLR
-Mixed precision (AMP): disabled
-
-Initialization complete!
-
-======================================================================
-STARTING TRAINING
-======================================================================
-Total epochs: 10000
-Evaluate interval: 1000
-Save interval: 2500
-Early stopping: patience=3000, min_delta=1e-06
-Training:   0%|          | 0/10000 [00:00<?, ?epoch/s]/home/olarinoyem/miniconda3/envs/deep_tf/lib/python3.11/site-packages/torch/autograd/graph.py:825: UserWarning: Attempting to run cuBLAS, but there was no current CUDA context! Attempting to set the primary context... (Triggered internally at ../aten/src/ATen/cuda/CublasHandlePool.cpp:135.)
-  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
-Training:   0%|          | 0/10000 [00:01<?, ?epoch/s, loss=7.421e+06, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 1/10000 [00:01<5:18:26,  1.91s/epoch, loss=7.421e+06, lr=0.0001]Training:   0%|          | 1/10000 [00:03<5:18:26,  1.91s/epoch, loss=2.94e+05, lr=0.0001] 
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 2/10000 [00:03<4:32:26,  1.63s/epoch, loss=2.94e+05, lr=0.0001]Training:   0%|          | 2/10000 [00:04<4:32:26,  1.63s/epoch, loss=9.041e+04, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 3/10000 [00:04<4:19:06,  1.56s/epoch, loss=9.041e+04, lr=0.0001]Training:   0%|          | 3/10000 [00:06<4:19:06,  1.56s/epoch, loss=5.212e+04, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 4/10000 [00:06<4:14:47,  1.53s/epoch, loss=5.212e+04, lr=0.0001]Training:   0%|          | 4/10000 [00:07<4:14:47,  1.53s/epoch, loss=3.567e+04, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 5/10000 [00:07<4:15:06,  1.53s/epoch, loss=3.567e+04, lr=0.0001]Training:   0%|          | 5/10000 [00:09<4:15:06,  1.53s/epoch, loss=2.433e+04, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 6/10000 [00:09<4:12:03,  1.51s/epoch, loss=2.433e+04, lr=0.0001]Training:   0%|          | 6/10000 [00:10<4:12:03,  1.51s/epoch, loss=1.638e+04, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 7/10000 [00:10<4:10:14,  1.50s/epoch, loss=1.638e+04, lr=0.0001]Training:   0%|          | 7/10000 [00:12<4:10:14,  1.50s/epoch, loss=1.185e+04, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 8/10000 [00:12<4:08:43,  1.49s/epoch, loss=1.185e+04, lr=0.0001]Training:   0%|          | 8/10000 [00:13<4:08:43,  1.49s/epoch, loss=9203, lr=0.0001]     
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 9/10000 [00:14<4:25:12,  1.59s/epoch, loss=9203, lr=0.0001]Training:   0%|          | 9/10000 [00:15<4:25:12,  1.59s/epoch, loss=6891, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 10/10000 [00:15<4:40:25,  1.68s/epoch, loss=6891, lr=0.0001]Training:   0%|          | 10/10000 [00:17<4:40:25,  1.68s/epoch, loss=5302, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 11/10000 [00:17<4:52:31,  1.76s/epoch, loss=5302, lr=0.0001]Training:   0%|          | 11/10000 [00:19<4:52:31,  1.76s/epoch, loss=4184, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 12/10000 [00:19<4:57:56,  1.79s/epoch, loss=4184, lr=0.0001]Training:   0%|          | 12/10000 [00:21<4:57:56,  1.79s/epoch, loss=3283, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 13/10000 [00:21<5:04:43,  1.83s/epoch, loss=3283, lr=0.0001]Training:   0%|          | 13/10000 [00:23<5:04:43,  1.83s/epoch, loss=2632, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 14/10000 [00:23<5:07:22,  1.85s/epoch, loss=2632, lr=0.0001]Training:   0%|          | 14/10000 [00:25<5:07:22,  1.85s/epoch, loss=2101, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 15/10000 [00:25<5:08:59,  1.86s/epoch, loss=2101, lr=0.0001]Training:   0%|          | 15/10000 [00:27<5:08:59,  1.86s/epoch, loss=1692, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 16/10000 [00:27<5:12:22,  1.88s/epoch, loss=1692, lr=0.0001]Training:   0%|          | 16/10000 [00:29<5:12:22,  1.88s/epoch, loss=1360, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 17/10000 [00:29<5:13:28,  1.88s/epoch, loss=1360, lr=0.0001]Training:   0%|          | 17/10000 [00:31<5:13:28,  1.88s/epoch, loss=1106, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 18/10000 [00:31<5:14:39,  1.89s/epoch, loss=1106, lr=0.0001]Training:   0%|          | 18/10000 [00:32<5:14:39,  1.89s/epoch, loss=909.2, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 19/10000 [00:33<5:15:04,  1.89s/epoch, loss=909.2, lr=0.0001]Training:   0%|          | 19/10000 [00:34<5:15:04,  1.89s/epoch, loss=755.2, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 20/10000 [00:34<5:14:55,  1.89s/epoch, loss=755.2, lr=0.0001]Training:   0%|          | 20/10000 [00:36<5:14:55,  1.89s/epoch, loss=628.8, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 21/10000 [00:36<5:15:02,  1.89s/epoch, loss=628.8, lr=0.0001]Training:   0%|          | 21/10000 [00:38<5:15:02,  1.89s/epoch, loss=539.7, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 22/10000 [00:38<5:15:42,  1.90s/epoch, loss=539.7, lr=0.0001]Training:   0%|          | 22/10000 [00:40<5:15:42,  1.90s/epoch, loss=444.4, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 23/10000 [00:40<5:15:42,  1.90s/epoch, loss=444.4, lr=0.0001]Training:   0%|          | 23/10000 [00:42<5:15:42,  1.90s/epoch, loss=378.9, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 24/10000 [00:42<5:17:39,  1.91s/epoch, loss=378.9, lr=0.0001]Training:   0%|          | 24/10000 [00:44<5:17:39,  1.91s/epoch, loss=338.7, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 25/10000 [00:44<5:17:30,  1.91s/epoch, loss=338.7, lr=0.0001]Training:   0%|          | 25/10000 [00:46<5:17:30,  1.91s/epoch, loss=284.3, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 26/10000 [00:46<5:18:00,  1.91s/epoch, loss=284.3, lr=0.0001]Training:   0%|          | 26/10000 [00:48<5:18:00,  1.91s/epoch, loss=259.6, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 27/10000 [00:48<5:16:52,  1.91s/epoch, loss=259.6, lr=0.0001]Training:   0%|          | 27/10000 [00:50<5:16:52,  1.91s/epoch, loss=224.4, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 28/10000 [00:50<5:15:23,  1.90s/epoch, loss=224.4, lr=0.0001]Training:   0%|          | 28/10000 [00:51<5:15:23,  1.90s/epoch, loss=207.7, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 29/10000 [00:52<5:15:12,  1.90s/epoch, loss=207.7, lr=0.0001]Training:   0%|          | 29/10000 [00:53<5:15:12,  1.90s/epoch, loss=184.5, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 30/10000 [00:54<5:15:50,  1.90s/epoch, loss=184.5, lr=0.0001]Training:   0%|          | 30/10000 [00:55<5:15:50,  1.90s/epoch, loss=170.8, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 31/10000 [00:55<5:16:10,  1.90s/epoch, loss=170.8, lr=0.0001]Training:   0%|          | 31/10000 [00:57<5:16:10,  1.90s/epoch, loss=156.7, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 32/10000 [00:57<5:15:51,  1.90s/epoch, loss=156.7, lr=0.0001]Training:   0%|          | 32/10000 [00:59<5:15:51,  1.90s/epoch, loss=146.2, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 33/10000 [00:59<5:14:46,  1.89s/epoch, loss=146.2, lr=0.0001]Training:   0%|          | 33/10000 [01:01<5:14:46,  1.89s/epoch, loss=134.1, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 34/10000 [01:01<5:15:37,  1.90s/epoch, loss=134.1, lr=0.0001]Training:   0%|          | 34/10000 [01:03<5:15:37,  1.90s/epoch, loss=123.9, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 35/10000 [01:03<5:16:03,  1.90s/epoch, loss=123.9, lr=0.0001]Training:   0%|          | 35/10000 [01:05<5:16:03,  1.90s/epoch, loss=118.5, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 36/10000 [01:05<5:15:53,  1.90s/epoch, loss=118.5, lr=0.0001]Training:   0%|          | 36/10000 [01:07<5:15:53,  1.90s/epoch, loss=108.2, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 37/10000 [01:07<5:18:47,  1.92s/epoch, loss=108.2, lr=0.0001]Training:   0%|          | 37/10000 [01:09<5:18:47,  1.92s/epoch, loss=105, lr=0.0001]  
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 38/10000 [01:09<5:18:43,  1.92s/epoch, loss=105, lr=0.0001]Training:   0%|          | 38/10000 [01:11<5:18:43,  1.92s/epoch, loss=100.5, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 39/10000 [01:11<5:19:54,  1.93s/epoch, loss=100.5, lr=0.0001]Training:   0%|          | 39/10000 [01:13<5:19:54,  1.93s/epoch, loss=94.34, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 40/10000 [01:13<5:16:18,  1.91s/epoch, loss=94.34, lr=0.0001]Training:   0%|          | 40/10000 [01:14<5:16:18,  1.91s/epoch, loss=90.09, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 41/10000 [01:14<5:15:22,  1.90s/epoch, loss=90.09, lr=0.0001]Training:   0%|          | 41/10000 [01:16<5:15:22,  1.90s/epoch, loss=83.35, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 42/10000 [01:17<5:25:25,  1.96s/epoch, loss=83.35, lr=0.0001]Training:   0%|          | 42/10000 [01:18<5:25:25,  1.96s/epoch, loss=84.06, lr=0.0001]Training:   0%|          | 43/10000 [01:18<5:18:24,  1.92s/epoch, loss=84.06, lr=0.0001]Training:   0%|          | 43/10000 [01:20<5:18:24,  1.92s/epoch, loss=79.23, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 44/10000 [01:20<5:17:51,  1.92s/epoch, loss=79.23, lr=0.0001]Training:   0%|          | 44/10000 [01:22<5:17:51,  1.92s/epoch, loss=73.19, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 45/10000 [01:22<5:19:09,  1.92s/epoch, loss=73.19, lr=0.0001]Training:   0%|          | 45/10000 [01:24<5:19:09,  1.92s/epoch, loss=70.19, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 46/10000 [01:24<5:22:40,  1.94s/epoch, loss=70.19, lr=0.0001]Training:   0%|          | 46/10000 [01:26<5:22:40,  1.94s/epoch, loss=72.7, lr=0.0001] Training:   0%|          | 47/10000 [01:26<5:18:59,  1.92s/epoch, loss=72.7, lr=0.0001]Training:   0%|          | 47/10000 [01:28<5:18:59,  1.92s/epoch, loss=64.94, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 48/10000 [01:28<5:18:50,  1.92s/epoch, loss=64.94, lr=0.0001]Training:   0%|          | 48/10000 [01:30<5:18:50,  1.92s/epoch, loss=72.8, lr=0.0001] Training:   0%|          | 49/10000 [01:30<5:14:57,  1.90s/epoch, loss=72.8, lr=0.0001]Training:   0%|          | 49/10000 [01:32<5:14:57,  1.90s/epoch, loss=64.69, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   0%|          | 50/10000 [01:32<5:15:01,  1.90s/epoch, loss=64.69, lr=0.0001]Training:   0%|          | 50/10000 [01:34<5:15:01,  1.90s/epoch, loss=67, lr=0.0001]   Training:   1%|          | 51/10000 [01:34<5:13:50,  1.89s/epoch, loss=67, lr=0.0001]Training:   1%|          | 51/10000 [01:36<5:13:50,  1.89s/epoch, loss=62.97, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 52/10000 [01:36<5:14:03,  1.89s/epoch, loss=62.97, lr=0.0001]Training:   1%|          | 52/10000 [01:37<5:14:03,  1.89s/epoch, loss=59.32, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 53/10000 [01:37<5:15:42,  1.90s/epoch, loss=59.32, lr=0.0001]Training:   1%|          | 53/10000 [01:39<5:15:42,  1.90s/epoch, loss=58.74, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 54/10000 [01:39<5:19:19,  1.93s/epoch, loss=58.74, lr=0.0001]Training:   1%|          | 54/10000 [01:41<5:19:19,  1.93s/epoch, loss=54.41, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 55/10000 [01:41<5:20:54,  1.94s/epoch, loss=54.41, lr=0.0001]Training:   1%|          | 55/10000 [01:43<5:20:54,  1.94s/epoch, loss=54.78, lr=0.0001]Training:   1%|          | 56/10000 [01:43<5:14:32,  1.90s/epoch, loss=54.78, lr=0.0001]Training:   1%|          | 56/10000 [01:45<5:14:32,  1.90s/epoch, loss=50.61, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 57/10000 [01:45<5:16:03,  1.91s/epoch, loss=50.61, lr=0.0001]Training:   1%|          | 57/10000 [01:47<5:16:03,  1.91s/epoch, loss=51.76, lr=0.0001]Training:   1%|          | 58/10000 [01:47<5:11:30,  1.88s/epoch, loss=51.76, lr=0.0001]Training:   1%|          | 58/10000 [01:49<5:11:30,  1.88s/epoch, loss=49.24, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 59/10000 [01:49<5:15:14,  1.90s/epoch, loss=49.24, lr=0.0001]Training:   1%|          | 59/10000 [01:51<5:15:14,  1.90s/epoch, loss=49.93, lr=0.0001]Training:   1%|          | 60/10000 [01:51<5:11:08,  1.88s/epoch, loss=49.93, lr=0.0001]Training:   1%|          | 60/10000 [01:53<5:11:08,  1.88s/epoch, loss=47.46, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 61/10000 [01:53<5:11:02,  1.88s/epoch, loss=47.46, lr=0.0001]Training:   1%|          | 61/10000 [01:54<5:11:02,  1.88s/epoch, loss=47.39, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 62/10000 [01:55<5:10:40,  1.88s/epoch, loss=47.39, lr=0.0001]Training:   1%|          | 62/10000 [01:56<5:10:40,  1.88s/epoch, loss=47.82, lr=0.0001]Training:   1%|          | 63/10000 [01:56<5:08:03,  1.86s/epoch, loss=47.82, lr=0.0001]Training:   1%|          | 63/10000 [01:58<5:08:03,  1.86s/epoch, loss=41.54, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 64/10000 [01:58<5:13:40,  1.89s/epoch, loss=41.54, lr=0.0001]Training:   1%|          | 64/10000 [02:00<5:13:40,  1.89s/epoch, loss=45.3, lr=0.0001] Training:   1%|          | 65/10000 [02:00<5:09:09,  1.87s/epoch, loss=45.3, lr=0.0001]Training:   1%|          | 65/10000 [02:02<5:09:09,  1.87s/epoch, loss=39.07, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 66/10000 [02:02<5:13:20,  1.89s/epoch, loss=39.07, lr=0.0001]Training:   1%|          | 66/10000 [02:04<5:13:20,  1.89s/epoch, loss=46.56, lr=0.0001]Training:   1%|          | 67/10000 [02:04<5:09:24,  1.87s/epoch, loss=46.56, lr=0.0001]Training:   1%|          | 67/10000 [02:06<5:09:24,  1.87s/epoch, loss=41.59, lr=0.0001]Training:   1%|          | 68/10000 [02:06<5:08:03,  1.86s/epoch, loss=41.59, lr=0.0001]Training:   1%|          | 68/10000 [02:08<5:08:03,  1.86s/epoch, loss=37.81, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 69/10000 [02:08<5:23:15,  1.95s/epoch, loss=37.81, lr=0.0001]Training:   1%|          | 69/10000 [02:10<5:23:15,  1.95s/epoch, loss=44.13, lr=0.0001]Training:   1%|          | 70/10000 [02:10<5:26:02,  1.97s/epoch, loss=44.13, lr=0.0001]Training:   1%|          | 70/10000 [02:12<5:26:02,  1.97s/epoch, loss=41.14, lr=0.0001]Training:   1%|          | 71/10000 [02:12<5:19:22,  1.93s/epoch, loss=41.14, lr=0.0001]Training:   1%|          | 71/10000 [02:14<5:19:22,  1.93s/epoch, loss=49.3, lr=0.0001] Training:   1%|          | 72/10000 [02:14<5:14:36,  1.90s/epoch, loss=49.3, lr=0.0001]Training:   1%|          | 72/10000 [02:15<5:14:36,  1.90s/epoch, loss=49.12, lr=0.0001]Training:   1%|          | 73/10000 [02:15<5:11:34,  1.88s/epoch, loss=49.12, lr=0.0001]Training:   1%|          | 73/10000 [02:17<5:11:34,  1.88s/epoch, loss=55.98, lr=0.0001]Training:   1%|          | 74/10000 [02:17<5:07:30,  1.86s/epoch, loss=55.98, lr=0.0001]Training:   1%|          | 74/10000 [02:19<5:07:30,  1.86s/epoch, loss=50.86, lr=0.0001]Training:   1%|          | 75/10000 [02:19<5:10:17,  1.88s/epoch, loss=50.86, lr=0.0001]Training:   1%|          | 75/10000 [02:21<5:10:17,  1.88s/epoch, loss=49.71, lr=0.0001]Training:   1%|          | 76/10000 [02:21<5:10:12,  1.88s/epoch, loss=49.71, lr=0.0001]Training:   1%|          | 76/10000 [02:23<5:10:12,  1.88s/epoch, loss=37.91, lr=0.0001]Training:   1%|          | 77/10000 [02:23<5:06:16,  1.85s/epoch, loss=37.91, lr=0.0001]Training:   1%|          | 77/10000 [02:25<5:06:16,  1.85s/epoch, loss=40.31, lr=0.0001]Training:   1%|          | 78/10000 [02:25<5:07:33,  1.86s/epoch, loss=40.31, lr=0.0001]Training:   1%|          | 78/10000 [02:27<5:07:33,  1.86s/epoch, loss=35.8, lr=0.0001] 
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 79/10000 [02:27<5:18:45,  1.93s/epoch, loss=35.8, lr=0.0001]Training:   1%|          | 79/10000 [02:29<5:18:45,  1.93s/epoch, loss=36.28, lr=0.0001]Training:   1%|          | 80/10000 [02:29<5:19:37,  1.93s/epoch, loss=36.28, lr=0.0001]Training:   1%|          | 80/10000 [02:31<5:19:37,  1.93s/epoch, loss=36.46, lr=0.0001]Training:   1%|          | 81/10000 [02:31<5:18:55,  1.93s/epoch, loss=36.46, lr=0.0001]Training:   1%|          | 81/10000 [02:32<5:18:55,  1.93s/epoch, loss=33.23, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 82/10000 [02:33<5:21:23,  1.94s/epoch, loss=33.23, lr=0.0001]Training:   1%|          | 82/10000 [02:35<5:21:23,  1.94s/epoch, loss=36.36, lr=0.0001]Training:   1%|          | 83/10000 [02:35<5:29:19,  1.99s/epoch, loss=36.36, lr=0.0001]Training:   1%|          | 83/10000 [02:37<5:29:19,  1.99s/epoch, loss=30.06, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 84/10000 [02:37<5:41:47,  2.07s/epoch, loss=30.06, lr=0.0001]Training:   1%|          | 84/10000 [02:39<5:41:47,  2.07s/epoch, loss=43.31, lr=0.0001]Training:   1%|          | 85/10000 [02:39<5:41:24,  2.07s/epoch, loss=43.31, lr=0.0001]Training:   1%|          | 85/10000 [02:41<5:41:24,  2.07s/epoch, loss=33.28, lr=0.0001]Training:   1%|          | 86/10000 [02:41<5:44:48,  2.09s/epoch, loss=33.28, lr=0.0001]Training:   1%|          | 86/10000 [02:43<5:44:48,  2.09s/epoch, loss=45.7, lr=0.0001] Training:   1%|          | 87/10000 [02:43<5:45:19,  2.09s/epoch, loss=45.7, lr=0.0001]Training:   1%|          | 87/10000 [02:45<5:45:19,  2.09s/epoch, loss=36.21, lr=0.0001]Training:   1%|          | 88/10000 [02:45<5:38:31,  2.05s/epoch, loss=36.21, lr=0.0001]Training:   1%|          | 88/10000 [02:47<5:38:31,  2.05s/epoch, loss=40.33, lr=0.0001]Training:   1%|          | 89/10000 [02:47<5:38:49,  2.05s/epoch, loss=40.33, lr=0.0001]Training:   1%|          | 89/10000 [02:49<5:38:49,  2.05s/epoch, loss=34.74, lr=0.0001]Training:   1%|          | 90/10000 [02:49<5:38:32,  2.05s/epoch, loss=34.74, lr=0.0001]Training:   1%|          | 90/10000 [02:51<5:38:32,  2.05s/epoch, loss=34.75, lr=0.0001]Training:   1%|          | 91/10000 [02:51<5:41:38,  2.07s/epoch, loss=34.75, lr=0.0001]Training:   1%|          | 91/10000 [02:54<5:41:38,  2.07s/epoch, loss=32.37, lr=0.0001]Training:   1%|          | 92/10000 [02:54<5:44:25,  2.09s/epoch, loss=32.37, lr=0.0001]Training:   1%|          | 92/10000 [02:56<5:44:25,  2.09s/epoch, loss=31.28, lr=0.0001]Training:   1%|          | 93/10000 [02:56<5:43:23,  2.08s/epoch, loss=31.28, lr=0.0001]Training:   1%|          | 93/10000 [02:58<5:43:23,  2.08s/epoch, loss=29.05, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 94/10000 [02:58<5:46:24,  2.10s/epoch, loss=29.05, lr=0.0001]Training:   1%|          | 94/10000 [03:00<5:46:24,  2.10s/epoch, loss=29.78, lr=0.0001]Training:   1%|          | 95/10000 [03:00<5:48:20,  2.11s/epoch, loss=29.78, lr=0.0001]Training:   1%|          | 95/10000 [03:02<5:48:20,  2.11s/epoch, loss=29.82, lr=0.0001]Training:   1%|          | 96/10000 [03:02<5:44:46,  2.09s/epoch, loss=29.82, lr=0.0001]Training:   1%|          | 96/10000 [03:04<5:44:46,  2.09s/epoch, loss=26.26, lr=0.0001]
-Checkpoint saved: experiments/AS5/best_model.pt
-Training:   1%|          | 97/10000 [03:04<5:45:37,  2.09s/epoch, loss=26.26, lr=0.0001]Training:   1%|          | 97/10000 [03:06<5:45:37,  2.09s/epoch, loss=28.11, lr=0.0001]Training:   1%|          | 98/10000 [03:06<5:42:56,  2.08s/epoch, loss=28.11, lr=0.0001]Training:   1%|          | 98/10000 [03:08<5:42:56,  2.08s/epoch, loss=26.29, lr=0.0001]Training:   1%|          | 99/10000 [03:08<5:43:38,  2.08s/epoch, loss=26.29, lr=0.0001]
-  Adaptive weights updated (epoch 100): wss=1.0000, physics=0.1000, bc_noslip=0.0939, pressure=0.0522, inlet=0.0246, outlet=0.0572, nut_reg=20.0000
-Training:   1%|          | 99/10000 [03:12<5:43:38,  2.08s/epoch, loss=145.4, lr=0.0001]Training:   1%|          | 100/10000 [03:12<7:06:59,  2.59s/epoch, loss=145.4, lr=0.0001]Training:   1%|          | 100/10000 [03:14<7:06:59,  2.59s/epoch, loss=151.3, lr=0.0001]Training:   1%|          | 101/10000 [03:14<6:32:53,  2.38s/epoch, loss=151.3, lr=0.0001]Training:   1%|          | 101/10000 [03:16<6:32:53,  2.38s/epoch, loss=138.3, lr=0.0001]Training:   1%|          | 102/10000 [03:16<6:03:42,  2.20s/epoch, loss=138.3, lr=0.0001]Training:   1%|          | 102/10000 [03:17<6:03:42,  2.20s/epoch, loss=161.1, lr=0.0001]Training:   1%|          | 103/10000 [03:17<5:41:16,  2.07s/epoch, loss=161.1, lr=0.0001]Training:   1%|          | 103/10000 [03:19<5:41:16,  2.07s/epoch, loss=130.6, lr=0.0001]Training:   1%|          | 104/10000 [03:19<5:29:36,  2.00s/epoch, loss=130.6, lr=0.0001]Training:   1%|          | 104/10000 [03:21<5:29:36,  2.00s/epoch, loss=143.1, lr=0.0001]Training:   1%|          | 105/10000 [03:21<5:22:02,  1.95s/epoch, loss=143.1, lr=0.0001]Training:   1%|          | 105/10000 [03:23<5:22:02,  1.95s/epoch, loss=152.7, lr=0.0001]Training:   1%|          | 106/10000 [03:23<5:18:40,  1.93s/epoch, loss=152.7, lr=0.0001]Training:   1%|          | 106/10000 [03:25<5:18:40,  1.93s/epoch, loss=191.4, lr=0.0001]Training:   1%|          | 107/10000 [03:25<5:20:31,  1.94s/epoch, loss=191.4, lr=0.0001]Training:   1%|          | 107/10000 [03:27<5:20:31,  1.94s/epoch, loss=129.2, lr=0.0001]Training:   1%|          | 108/10000 [03:27<5:20:57,  1.95s/epoch, loss=129.2, lr=0.0001]Training:   1%|          | 108/10000 [03:29<5:20:57,  1.95s/epoch, loss=121.7, lr=0.0001]Training:   1%|          | 109/10000 [03:29<5:16:40,  1.92s/epoch, loss=121.7, lr=0.0001]Training:   1%|          | 109/10000 [03:31<5:16:40,  1.92s/epoch, loss=129, lr=0.0001]  Training:   1%|          | 110/10000 [03:31<5:13:23,  1.90s/epoch, loss=129, lr=0.0001]Training:   1%|          | 110/10000 [03:32<5:13:23,  1.90s/epoch, loss=143.4, lr=0.0001]Training:   1%|          | 111/10000 [03:32<5:11:25,  1.89s/epoch, loss=143.4, lr=0.0001]Training:   1%|          | 111/10000 [03:34<5:11:25,  1.89s/epoch, loss=105.2, lr=0.0001]Training:   1%|          | 112/10000 [03:34<5:08:59,  1.87s/epoch, loss=105.2, lr=0.0001]Training:   1%|          | 112/10000 [03:36<5:08:59,  1.87s/epoch, loss=125.4, lr=0.0001]Training:   1%|          | 113/10000 [03:36<5:07:46,  1.87s/epoch, loss=125.4, lr=0.0001]Training:   1%|          | 113/10000 [03:38<5:07:46,  1.87s/epoch, loss=109.3, lr=0.0001]Training:   1%|          | 114/10000 [03:38<5:07:43,  1.87s/epoch, loss=109.3, lr=0.0001]Training:   1%|          | 114/10000 [03:40<5:07:43,  1.87s/epoch, loss=114, lr=0.0001]  Training:   1%|          | 115/10000 [03:40<5:10:56,  1.89s/epoch, loss=114, lr=0.0001]Training:   1%|          | 115/10000 [03:42<5:10:56,  1.89s/epoch, loss=95.02, lr=0.0001]Training:   1%|          | 116/10000 [03:42<5:14:10,  1.91s/epoch, loss=95.02, lr=0.0001]Training:   1%|          | 116/10000 [03:44<5:14:10,  1.91s/epoch, loss=113.6, lr=0.0001]Training:   1%|          | 117/10000 [03:44<5:14:23,  1.91s/epoch, loss=113.6, lr=0.0001]Training:   1%|          | 117/10000 [03:46<5:14:23,  1.91s/epoch, loss=98.97, lr=0.0001]Training:   1%|          | 118/10000 [03:46<5:12:17,  1.90s/epoch, loss=98.97, lr=0.0001]Training:   1%|          | 118/10000 [03:48<5:12:17,  1.90s/epoch, loss=118.2, lr=0.0001]Training:   1%|          | 119/10000 [03:48<5:10:47,  1.89s/epoch, loss=118.2, lr=0.0001]Training:   1%|          | 119/10000 [03:49<5:10:47,  1.89s/epoch, loss=84.39, lr=0.0001]Training:   1%|          | 120/10000 [03:49<5:10:46,  1.89s/epoch, loss=84.39, lr=0.0001]Training:   1%|          | 120/10000 [03:51<5:10:46,  1.89s/epoch, loss=92.52, lr=0.0001]Training:   1%|          | 121/10000 [03:51<5:15:26,  1.92s/epoch, loss=92.52, lr=0.0001]Training:   1%|          | 121/10000 [03:53<5:15:26,  1.92s/epoch, loss=84.24, lr=0.0001]Training:   1%|          | 122/10000 [03:53<5:16:41,  1.92s/epoch, loss=84.24, lr=0.0001]Training:   1%|          | 122/10000 [03:55<5:16:41,  1.92s/epoch, loss=99.11, lr=0.0001]Training:   1%|          | 123/10000 [03:55<5:14:32,  1.91s/epoch, loss=99.11, lr=0.0001]Training:   1%|          | 123/10000 [03:57<5:14:32,  1.91s/epoch, loss=76.94, lr=0.0001]Training:   1%|          | 124/10000 [03:57<5:14:05,  1.91s/epoch, loss=76.94, lr=0.0001]Training:   1%|          | 124/10000 [03:59<5:14:05,  1.91s/epoch, loss=94.41, lr=0.0001]Training:   1%|▏         | 125/10000 [03:59<5:15:12,  1.92s/epoch, loss=94.41, lr=0.0001]Training:   1%|▏         | 125/10000 [04:01<5:15:12,  1.92s/epoch, loss=77.39, lr=0.0001]Training:   1%|▏         | 126/10000 [04:01<5:15:06,  1.91s/epoch, loss=77.39, lr=0.0001]Training:   1%|▏         | 126/10000 [04:03<5:15:06,  1.91s/epoch, loss=81.82, lr=0.0001]Training:   1%|▏         | 127/10000 [04:03<5:13:25,  1.90s/epoch, loss=81.82, lr=0.0001]Training:   1%|▏         | 127/10000 [04:05<5:13:25,  1.90s/epoch, loss=71.77, lr=0.0001]Training:   1%|▏         | 128/10000 [04:05<5:11:30,  1.89s/epoch, loss=71.77, lr=0.0001]Training:   1%|▏         | 128/10000 [04:07<5:11:30,  1.89s/epoch, loss=91.36, lr=0.0001]Training:   1%|▏         | 129/10000 [04:07<5:13:25,  1.91s/epoch, loss=91.36, lr=0.0001]Training:   1%|▏         | 129/10000 [04:09<5:13:25,  1.91s/epoch, loss=69, lr=0.0001]   Training:   1%|▏         | 130/10000 [04:09<5:14:26,  1.91s/epoch, loss=69, lr=0.0001]Training:   1%|▏         | 130/10000 [04:10<5:14:26,  1.91s/epoch, loss=74.12, lr=0.0001]Training:   1%|▏         | 131/10000 [04:10<5:13:32,  1.91s/epoch, loss=74.12, lr=0.0001]Training:   1%|▏         | 131/10000 [04:12<5:13:32,  1.91s/epoch, loss=63.08, lr=0.0001]Training:   1%|▏         | 132/10000 [04:12<5:14:06,  1.91s/epoch, loss=63.08, lr=0.0001]Training:   1%|▏         | 132/10000 [04:14<5:14:06,  1.91s/epoch, loss=73.32, lr=0.0001]Training:   1%|▏         | 133/10000 [04:14<5:11:24,  1.89s/epoch, loss=73.32, lr=0.0001]Training:   1%|▏         | 133/10000 [04:16<5:11:24,  1.89s/epoch, loss=64.14, lr=0.0001]Training:   1%|▏         | 134/10000 [04:16<5:09:09,  1.88s/epoch, loss=64.14, lr=0.0001]Training:   1%|▏         | 134/10000 [04:18<5:09:09,  1.88s/epoch, loss=81.01, lr=0.0001]Training:   1%|▏         | 135/10000 [04:18<5:07:23,  1.87s/epoch, loss=81.01, lr=0.0001]
