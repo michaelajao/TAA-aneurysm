@@ -187,68 +187,89 @@ where $\sigma$ denotes the Swish activation ($\sigma(x) = x \cdot \mathrm{sigmoi
 \begin{figure}[t]
 \centering
 \resizebox{\textwidth}{!}{
-\begin{tikzpicture}[
-  >=stealth,
-  node distance=1.5cm and 1cm,
-  box/.style={draw, rounded corners, fill=white, minimum width=2cm, minimum height=1cm, align=center, thick},
-  net/.style={draw, rounded corners, fill=blue!10, minimum width=1.5cm, minimum height=0.6cm, align=center, thick},
-  loss/.style={draw, rounded corners, fill=red!10, minimum width=2.4cm, minimum height=1cm, align=center, thick},
+\begin{tikzpicture}[x=1cm, y=1cm, >=stealth,
+  box/.style={draw, rounded corners, fill=white, minimum width=2.2cm, minimum height=1.0cm, align=center, thick},
+  net/.style={draw, rounded corners, minimum width=1.4cm, minimum height=0.6cm, align=center, thick, font=\small},
+  deriv/.style={draw, rounded corners, fill=yellow!15, minimum width=2.0cm, minimum height=1.0cm, align=center, thick, font=\small},
+  loss/.style={draw, rounded corners, minimum width=3.0cm, minimum height=1.0cm, align=center, thick, font=\small},
   arrow/.style={->, thick},
-  dashed_arrow/.style={->, thick, dashed}
+  thinArrow/.style={->, semithick, gray}
 ]
 
-% 1. Input
-\node[box, fill=gray!10] (input) {Input \\ $\mathbf{z} = (x, y, z, t)$};
-
-% 2. Fourier
-\node[box, fill=cyan!10, right=1.2cm of input] (fourier) {Fourier \\ $\phi(\mathbf{z})$};
+% ── Input & Fourier ──────────────────────────────────────────────────────────
+\node[box, fill=gray!10] (input)   at (0.0,  0.0) {Input \\ $\mathbf{z}=(x,y,z,t)$};
+\node[box, fill=cyan!10] (fourier) at (3.0,  0.0) {Fourier \\ $\phi(\mathbf{z})$};
 \draw[arrow] (input) -- (fourier);
 
-% 3. Networks
-\node[net, right=1.5cm of fourier, yshift=2.0cm] (netu) {Net$_u$};
-\node[net, below=0.3cm of netu] (netv) {Net$_v$};
-\node[net, below=0.3cm of netv] (netw) {Net$_w$};
-\node[net, below=0.3cm of netw] (netp) {Net$_p$};
-\node[net, below=0.3cm of netp, fill=orange!15] (netnut) {Net$_{\nu_t}$};
+% ── Five networks at absolute y positions ────────────────────────────────────
+\node[net, fill=blue!10]   (netu)   at (6.2,  3.0) {Net$_u$};
+\node[net, fill=blue!10]   (netv)   at (6.2,  2.0) {Net$_v$};
+\node[net, fill=blue!10]   (netw)   at (6.2,  1.0) {Net$_w$};
+\node[net, fill=blue!10]   (netp)   at (6.2, -0.5) {Net$_p$};
+\node[net, fill=orange!15] (netnut) at (6.2, -2.0) {Net$_{\nu_t}$};
 
-\draw[arrow] (fourier.east) -- ++(0.5,0) |- (netu.west);
-\draw[arrow] (fourier.east) -- ++(0.5,0) |- (netv.west);
-\draw[arrow] (fourier.east) -- ++(0.5,0) |- (netw.west);
-\draw[arrow] (fourier.east) -- ++(0.5,0) |- (netp.west);
-\draw[arrow] (fourier.east) -- ++(0.5,0) |- (netnut.west);
+% Fourier fans out to all networks via a hub
+\coordinate (fhub) at (4.8, 0.0);
+\draw (fourier.east) -- (fhub);
+\draw[thinArrow] (fhub) |- (netu.west);
+\draw[thinArrow] (fhub) |- (netv.west);
+\draw[thinArrow] (fhub) |- (netw.west);
+\draw[thinArrow] (fhub) |- (netp.west);
+\draw[thinArrow] (fhub) |- (netnut.west);
 
-% 4. Outputs
-\node[right=0.8cm of netu] (u) {$u$};
-\node[right=0.8cm of netv] (v) {$v$};
-\node[right=0.8cm of netw] (w) {$w$};
-\node[right=0.8cm of netp] (p) {$p$};
-\node[right=0.8cm of netnut] (nut) {$\nu_t$};
+% ── Scalar outputs ───────────────────────────────────────────────────────────
+\node[font=\small] (u)   at (7.9,  3.0) {$u$};
+\node[font=\small] (v)   at (7.9,  2.0) {$v$};
+\node[font=\small] (w)   at (7.9,  1.0) {$w$};
+\node[font=\small] (p)   at (7.9, -0.5) {$p$};
+\node[font=\small] (nut) at (7.9, -2.0) {$\nu_t$};
 
-\draw[arrow] (netu) -- (u);
-\draw[arrow] (netv) -- (v);
-\draw[arrow] (netw) -- (w);
-\draw[arrow] (netp) -- (p);
+\draw[arrow] (netu)   -- (u);
+\draw[arrow] (netv)   -- (v);
+\draw[arrow] (netw)   -- (w);
+\draw[arrow] (netp)   -- (p);
 \draw[arrow] (netnut) -- (nut);
 
-\node[draw, dashed, inner sep=0.15cm, fit=(u)(v)(w), label=above:\small Velocity $\mathbf{u}$] (vel) {};
+% Velocity group dashed box (wraps u, v, w)
+\node[draw, dashed, rounded corners, inner sep=0.2cm,
+      fit=(u)(v)(w),
+      label={[font=\scriptsize]above:Velocity $\mathbf{u}$}] (vel) {};
 
-% 5. Derivatives (Autograd)
-\node[box, fill=yellow!15, right=1.5cm of vel] (wss) {WSS \& \\ Traction};
-\node[box, fill=yellow!15, right=1.5cm of p, yshift=-1.0cm, minimum height=1.2cm] (pde) {RANS PDE \\ Residuals};
+% ── Derived quantity boxes ───────────────────────────────────────────────────
+\node[deriv] (wss) at (10.5,  2.0)  {WSS \& \\ Traction};
+\node[deriv] (pde) at (10.5, -1.25) {RANS PDE \\ Residuals};
 
+% ── Loss boxes ───────────────────────────────────────────────────────────────
+\node[loss, fill=red!10]   (lossdata)  at (13.8,  2.0)  {Data \& BCs \\ $\mathcal{L}_{\text{WSS}},\mathcal{L}_p,\mathcal{L}_{\text{wall}}$};
+\node[loss, fill=green!15] (lossphys)  at (13.8, -1.25) {Physics \\ $\mathcal{L}_{\text{RANS}},\mathcal{L}_{\nu_t}$};
+
+% ── Arrows ───────────────────────────────────────────────────────────────────
+
+% vel → WSS (straight horizontal)
 \draw[arrow] (vel.east) -- (wss.west);
-\draw[dashed_arrow] (nut.east) -| ++(0.4, 2.5) -- (wss.west);
 
-\draw[arrow] (vel.east) -| (pde.north);
-\draw[arrow] (p.east) -| (pde.north);
-\draw[arrow] (nut.east) -| (pde.north);
+% vel → RANS PDE: drops below vel, enters pde.north on the left side
+% Path goes down from vel.south into the clear gap between WSS and RANS, then right into pde
+\draw[thinArrow] (vel.south) -- ++(0,-0.3) -| ([xshift=-0.35cm]pde.north);
 
-% 6. Loss Functions
-\node[loss, right=1.2cm of wss] (lossdata) {Data \& BCs \\ $\mathcal{L}_{\text{WSS}}, \mathcal{L}_p, \mathcal{L}_{\text{wall}}$};
-\node[loss, fill=green!15, right=1.2cm of pde] (lossphys) {Physics \\ $\mathcal{L}_{\text{RANS}}, \mathcal{L}_{\nu_t}$};
+% p → RANS PDE: exits p.east, goes right and slightly down into pde.north right side
+% y=-0.5 (p) is above pde.north (y=-0.75) so the path is clean
+\draw[thinArrow] (p.east) -| ([xshift=0.35cm]pde.north);
 
+% nut → RANS PDE: exits nut.east, goes right at y=-2.0 (below pde.south at -1.75),
+% then turns up into pde.south — never crosses p's path
+\draw[thinArrow] (nut.east) -| ([xshift=0.35cm]pde.south);
+
+% WSS → Data & BCs (straight horizontal)
 \draw[arrow] (wss.east) -- (lossdata.west);
-\draw[arrow] (p.east) -| ++(0.6, 2.2) -- (lossdata.west);
+
+% p → Data & BCs: exits p.north, goes up 0.3 above RANS column level,
+% then right to lossdata centre-x, then up into lossdata.south
+% The horizontal at y≈0 clears both RANS (top at -0.75) and lossphys (top at -0.75)
+% The vertical at x=13.8 rises through the gap between lossphys.north and lossdata.south
+\draw[thinArrow] (p.north) -- ++(0,0.3) -| (lossdata.south);
+
+% RANS PDE → Physics Loss (straight horizontal)
 \draw[arrow] (pde.east) -- (lossphys.west);
 
 \end{tikzpicture}
@@ -291,18 +312,6 @@ where $\sigma$ denotes the Swish activation ($\sigma(x) = x \cdot \mathrm{sigmoi
 \node[dim, below=0.1cm of r1] {$\mathbb{R}^H$};
 \node[dim, below=0.1cm of rL] {$\mathbb{R}^H$};
 \node[dim, below=0.1cm of dec] {$\mathbb{R}^1$};
-
-\node[below=1.2cm of r1, align=left, anchor=west, xshift=-1cm, font=\small, draw, dashed, inner sep=0.2cm] (res) {
-    \textbf{Residual Block Formulation:}\\
-    $\mathbf{h}^{(\ell+1)} = \mathbf{h}^{(\ell)} + \mathbf{W}_2^{(\ell)} \sigma(\mathbf{W}_1^{(\ell)} \mathbf{h}^{(\ell)})$ \\
-    \textit{(No outer activation)}
-};
-
-\node[below=1.2cm of rL, align=left, anchor=east, xshift=1cm, font=\small, draw, dashed, inner sep=0.2cm] (params) {
-    \textbf{Branch Hyperparameters:}\\
-    Flow ($u,v,w,p$): $H=128$, $L=6$ \\
-    Turbulence ($\nu_t$): $H=64$, $L=4$
-};
 
 \end{tikzpicture}
 }
@@ -431,13 +440,20 @@ Figure~\ref{fig:loss_schematic} provides an overview of how the individual losse
         % Optimiser update paths
         \draw[arrow] (Ltotal.south) -| (flowopt.north);
         
-        % Nu_t paths bypassing total loss (routed to the far right)
-        \draw[arrow, blue, dashed] (Lphys.east) -| (6.2, 0.6) |- (nutopt.east);
-        \draw[arrow, blue, dashed] (Lnut.east) -| (6.0, 0.6) |- (nutopt.east);
+        % Nu_t paths bypassing total loss (routed above L_nut through gap, then far right)
+        % L_physics: exit north, go up into gap between rows, then right to margin
+        \draw[blue, dashed, semithick] (Lphys.north) |- (6.5, 1.75);
+        % L_nut: exit east, straight right to margin
+        \draw[blue, dashed, semithick] (Lnut.east) -- (6.5, 1.2);
+        % Merge at junction on right margin
+        \draw[blue, dashed, semithick] (6.5, 1.75) -- (6.5, 1.2);
+        \fill[blue] (6.5, 1.2) circle (2pt);
+        % Descend to nu_t optimiser
+        \draw[arrow, blue, dashed] (6.5, 1.2) -- (6.5, -1.5) -- (nutopt.east);
 
         % Labels and legend
         \node[font=\footnotesize, gray]    at (-3.5, -0.6) {all losses $\to$};
-        \node[font=\footnotesize, blue] at ( 5.5, -0.6) {physics \& $\nu_t$ $\to$};
+        \node[font=\footnotesize, blue] at ( 6.5, -0.6) {physics \& $\nu_t$};
 \end{tikzpicture}
 }
 \caption{Loss composition and dual-optimiser routing. Data terms (WSS, pressure) and boundary terms (no-slip, inlet, outlet) are combined with the physics residual and $\nu_t$ regularisation via adaptive weights. All terms flow to the flow optimiser that updates $u,v,w,p$; only the physics loss and $\nu_t$ regularisation update the turbulent viscosity network.}

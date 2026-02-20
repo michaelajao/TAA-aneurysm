@@ -52,25 +52,25 @@
 \newlabel{fig:arch_overview}{{1}{6}{High-level PINN architecture. A shared input $\mathbf {z}$ is mapped through Fourier feature encoding and then fed into five independent networks. The three velocity outputs ($u$, $v$, $w$) are used to derive WSS via automatic differentiation of the stress tensor at the wall; WSS is not a separate network output. Data and boundary losses operate on wall predictions, while the physics loss enforces RANS residuals at interior collocation points using all five outputs}{figure.caption.1}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.2}Fourier Feature Encoding}{6}{subsubsection.3.3.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.3}Residual MLP (Per Branch)}{6}{subsubsection.3.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Loss Function}{6}{subsection.3.4}\protected@file@percent }
+\newlabel{sec:loss}{{3.4}{6}{Loss Function}{subsection.3.4}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Single network branch laid out left to right: the 4D input $\mathbf  {z}$ is mapped through Fourier features ($\mathbb  {R}^{32}$), a linear encoder with Swish activation, a stack of $L$ residual blocks (all at hidden dimension $H$), and a linear decoder to one scalar. Each residual block applies $\mathbf  {h} + \mathbf  {W}_2\,\sigma (\mathbf  {W}_1\,\mathbf  {h})$ without an outer activation. Flow branches use $H=128$, $L=6$; the $\nu _t$ branch uses $H=64$, $L=4$ with a softplus output transform.}}{7}{figure.caption.2}\protected@file@percent }
 \newlabel{fig:arch_branch}{{2}{7}{Single network branch laid out left to right: the 4D input $\mathbf {z}$ is mapped through Fourier features ($\mathbb {R}^{32}$), a linear encoder with Swish activation, a stack of $L$ residual blocks (all at hidden dimension $H$), and a linear decoder to one scalar. Each residual block applies $\mathbf {h} + \mathbf {W}_2\,\sigma (\mathbf {W}_1\,\mathbf {h})$ without an outer activation. Flow branches use $H=128$, $L=6$; the $\nu _t$ branch uses $H=64$, $L=4$ with a softplus output transform}{figure.caption.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Loss Function}{7}{subsection.3.4}\protected@file@percent }
-\newlabel{sec:loss}{{3.4}{7}{Loss Function}{subsection.3.4}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.1}Data and Boundary Terms}{7}{subsubsection.3.4.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.2}Physics Loss}{7}{subsubsection.3.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}$\nu _t$ Lower-Bound Regularisation}{7}{subsubsection.3.4.3}\protected@file@percent }
 \citation{ref_wang2021}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}$\nu _t$ Lower-Bound Regularisation}{8}{subsubsection.3.4.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.4}Total Loss}{8}{subsubsection.3.4.4}\protected@file@percent }
 \newlabel{eq:total_loss}{{11}{8}{Total Loss}{equation.11}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.5}Gradient-Norm Adaptive Loss Weighting}{8}{subsubsection.3.4.5}\protected@file@percent }
 \newlabel{sec:adaptive_weights}{{3.4.5}{8}{Gradient-Norm Adaptive Loss Weighting}{subsubsection.3.4.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Training Procedure}{8}{subsection.3.5}\protected@file@percent }
+\newlabel{sec:training}{{3.5}{8}{Training Procedure}{subsection.3.5}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.1}Alternating Dual-Optimiser Strategy}{8}{subsubsection.3.5.1}\protected@file@percent }
 \@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Gradient-Norm Adaptive Loss Weighting}}{9}{algorithm.1}\protected@file@percent }
 \newlabel{alg:adaptive_weights}{{1}{9}{Gradient-Norm Adaptive Loss Weighting}{algorithm.1}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Loss composition and dual-optimiser routing. Data terms (WSS, pressure) and boundary terms (no-slip, inlet, outlet) are combined with the physics residual and $\nu _t$ regularisation via adaptive weights. All terms flow to the flow optimiser that updates $u,v,w,p$; only the physics loss and $\nu _t$ regularisation update the turbulent viscosity network.}}{9}{figure.caption.3}\protected@file@percent }
 \newlabel{fig:loss_schematic}{{3}{9}{Loss composition and dual-optimiser routing. Data terms (WSS, pressure) and boundary terms (no-slip, inlet, outlet) are combined with the physics residual and $\nu _t$ regularisation via adaptive weights. All terms flow to the flow optimiser that updates $u,v,w,p$; only the physics loss and $\nu _t$ regularisation update the turbulent viscosity network}{figure.caption.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Training Procedure}{9}{subsection.3.5}\protected@file@percent }
-\newlabel{sec:training}{{3.5}{9}{Training Procedure}{subsection.3.5}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.1}Alternating Dual-Optimiser Strategy}{9}{subsubsection.3.5.1}\protected@file@percent }
 \@writefile{loa}{\contentsline {algorithm}{\numberline {2}{\ignorespaces Per-Epoch Training Loop with Alternating Dual-Optimiser}}{10}{algorithm.2}\protected@file@percent }
 \newlabel{alg:training}{{2}{10}{Per-Epoch Training Loop with Alternating Dual-Optimiser}{algorithm.2}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.2}Optimiser Hyperparameters}{10}{subsubsection.3.5.2}\protected@file@percent }
