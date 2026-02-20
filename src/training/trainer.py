@@ -1139,19 +1139,16 @@ class TAATrainer:
             writer.writeheader()
             writer.writerows(self.loss_history)
 
-        # --- PNG ---
+        # --- PNG 1: 2x1 (Total Loss, Component Losses) ---
         epochs = [r["epoch"] for r in self.loss_history]
-        has_aw = any("aw_wss" in r for r in self.loss_history)
-        n_rows = 3 if has_aw else 2
-        fig, axes = plt.subplots(n_rows, 2, figsize=(14, 5 * n_rows),
-                                 constrained_layout=True)
-
+        fig1, axes1 = plt.subplots(2, 1, figsize=(10, 10), constrained_layout=True)
+        
         # Total loss
-        axes[0, 0].semilogy(epochs, [r["total"] for r in self.loss_history])
-        axes[0, 0].set_title("Total Loss")
-        axes[0, 0].set_xlabel("Epoch")
-        axes[0, 0].set_ylabel("Loss")
-        axes[0, 0].grid(True, alpha=0.3)
+        axes1[0].semilogy(epochs, [r["total"] for r in self.loss_history])
+        axes1[0].set_title("Total Loss")
+        axes1[0].set_xlabel("Epoch")
+        axes1[0].set_ylabel("Loss")
+        axes1[0].grid(True, alpha=0.3)
 
         # Component losses
         for key, lbl in [("wss", "WSS"), ("physics", "Physics"),
@@ -1159,71 +1156,43 @@ class TAATrainer:
                           ("inlet", "Inlet BC"), ("outlet", "Outlet BC")]:
             vals = [r.get(key, 0.0) for r in self.loss_history]
             if any(v > 0 for v in vals):
-                axes[0, 1].semilogy(epochs, vals, label=lbl)
-        axes[0, 1].set_title("Component Losses")
-        axes[0, 1].set_xlabel("Epoch")
-        axes[0, 1].set_ylabel("Loss")
-        axes[0, 1].legend()
-        axes[0, 1].grid(True, alpha=0.3)
+                axes1[1].semilogy(epochs, vals, label=lbl)
+        axes1[1].set_title("Component Losses")
+        axes1[1].set_xlabel("Epoch")
+        axes1[1].set_ylabel("Loss")
+        axes1[1].legend()
+        axes1[1].grid(True, alpha=0.3)
+        
+        fig1.suptitle(f"{self.config['experiment']['name']} — Loss Curves", fontsize=14)
+        fig1.savefig(self.output_dir / "loss_curves_2x1.png", dpi=300)
+        plt.close(fig1)
 
+        # --- PNG 2: 1x2 (Physics Residuals, Learning Rate/Adaptive Weights) ---
+        fig2, axes2 = plt.subplots(1, 2, figsize=(14, 5), constrained_layout=True)
+        
         # Physics residuals
         for key, lbl in [("res_mom_x", "Mom-X"), ("res_mom_y", "Mom-Y"),
                           ("res_mom_z", "Mom-Z"), ("res_cont", "Continuity")]:
-            axes[1, 0].semilogy(epochs, [r[key] for r in self.loss_history], label=lbl)
-        axes[1, 0].set_title("Physics Residuals")
-        axes[1, 0].set_xlabel("Epoch")
-        axes[1, 0].set_ylabel("Residual")
-        axes[1, 0].legend()
-        axes[1, 0].grid(True, alpha=0.3)
+            axes2[0].semilogy(epochs, [r[key] for r in self.loss_history], label=lbl)
+        axes2[0].set_title("Physics Residuals")
+        axes2[0].set_xlabel("Epoch")
+        axes2[0].set_ylabel("Residual")
+        axes2[0].legend()
+        axes2[0].grid(True, alpha=0.3)
 
         # Learning rate
-        axes[1, 1].semilogy(epochs, [r["lr"] for r in self.loss_history])
-        axes[1, 1].set_title("Learning Rate")
-        axes[1, 1].set_xlabel("Epoch")
-        axes[1, 1].set_ylabel("LR")
-        axes[1, 1].grid(True, alpha=0.3)
+        axes2[1].semilogy(epochs, [r["lr"] for r in self.loss_history])
+        axes2[1].set_title("Learning Rate")
+        axes2[1].set_xlabel("Epoch")
+        axes2[1].set_ylabel("LR")
+        axes2[1].grid(True, alpha=0.3)
+        
+        fig2.suptitle(f"{self.config['experiment']['name']} — Training Dynamics", fontsize=14)
+        fig2.savefig(self.output_dir / "loss_curves_1x2.png", dpi=300)
+        plt.close(fig2)
 
-        # Row 3: Gradient norms and adaptive weights (when available)
-        if has_aw:
-            for name, lbl in [("wss", "WSS"), ("physics", "Physics"),
-                               ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure"),
-                               ("inlet", "Inlet BC"), ("outlet", "Outlet BC")]:
-                vals = [r.get(f"grad_norm_{name}", float('nan'))
-                        for r in self.loss_history]
-                valid = [(e, v) for e, v in zip(epochs, vals)
-                         if v == v]  # filter NaN
-                if valid:
-                    ep, vv = zip(*valid)
-                    axes[2, 0].semilogy(ep, vv, label=lbl, marker='.', markersize=2,
-                                        linewidth=0.8)
-            axes[2, 0].set_title("Gradient Norms (per loss)")
-            axes[2, 0].set_xlabel("Epoch")
-            axes[2, 0].set_ylabel("Mean |grad|")
-            axes[2, 0].legend()
-            axes[2, 0].grid(True, alpha=0.3)
-
-            for name, lbl in [("wss", "WSS"), ("physics", "Physics"),
-                               ("bc_noslip", "No-Slip BC"), ("pressure", "Pressure"),
-                               ("inlet", "Inlet BC"), ("outlet", "Outlet BC")]:
-                vals = [r.get(f"aw_{name}", float('nan'))
-                        for r in self.loss_history]
-                valid = [(e, v) for e, v in zip(epochs, vals)
-                         if v == v]
-                if valid:
-                    ep, vv = zip(*valid)
-                    axes[2, 1].semilogy(ep, vv, label=lbl, marker='.', markersize=2,
-                                        linewidth=0.8)
-            axes[2, 1].set_title("Adaptive Weights")
-            axes[2, 1].set_xlabel("Epoch")
-            axes[2, 1].set_ylabel("Weight")
-            axes[2, 1].legend()
-            axes[2, 1].grid(True, alpha=0.3)
-
-        fig.suptitle(f"{self.config['experiment']['name']} — Training Curves", fontsize=14)
-        fig.savefig(self.output_dir / "loss_curves.png", dpi=300)
-        plt.close(fig)
         print(f"Loss history saved: {csv_path}")
-        print(f"Loss curves saved:  {self.output_dir / 'loss_curves.png'}")
+        print(f"Loss curves saved:  {self.output_dir / 'loss_curves_2x1.png'} and loss_curves_1x2.png")
 
     def train(self):
         """Main training loop.

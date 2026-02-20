@@ -66,6 +66,16 @@ GPU=1 bash scripts/run_training.sh
 
 # Generate comparison plots from a trained model
 python -m src.utils.plotting --geom AS5
+
+# Generate publication-quality loss curve plots
+python -m src.utils.plotting --loss-plots --geom AS5
+
+# Generate cross-geometry summary bar chart
+python -m src.utils.plotting --summary
+
+# bash scripts/run_training.sh to train all geometries on a specific GPU
+GEOMS="AD5 AD6" GPU=0 bash scripts/run_training.sh
+
 ```
 
 ## Network Architecture

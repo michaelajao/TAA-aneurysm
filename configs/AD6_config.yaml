@@ -48,7 +48,7 @@ training:
   eval_interval: 1000
   early_stopping:
     enabled: true
-    patience: 3000
+    patience: 1000
     min_delta: 1.0e-6
   output_dir: experiments/AD6/
 

@@ -271,20 +271,21 @@ At a set of \emph{collocation points} $\{\mathbf{x}_i\}$ sampled in the interior
 \end{equation}
 Derivatives of $\mathbf{u}$, $p$, and $\nu_t$ with respect to $\mathbf{x}_{\text{std}}$ are obtained by automatic differentiation; the chain rule converts them to the non-dimensional physical space used in the PDE. Typically $N_c \approx 6000$ interior points per phase, processed in minibatches (e.g.\ 3000 per batch).
 
-\subsubsection{Turbulent Viscosity Regularisation}
+\subsubsection{$\nu_t$ Lower-Bound Regularisation}
 
-To prevent the $\nu_t$ network from collapsing to zero (a trivial solution that simplifies the momentum residual), we add a soft penalty that encourages $\nu_{t,\text{bar}}$ to stay above a target floor (e.g.\ 0.05) at collocation points:
+To prevent the vanishing gradient problem and the trivial $\nu_t = 0$ solution (a degenerate laminar flow collapse), we first introduce a softplus activation with a specific shift factor (e.g., $+2.0$) to guarantee non-zero initialisations and robust gradient propagation. Additionally, we apply a soft penalty loss, $\mathcal{L}_{\nu_t}$, that penalises the mean turbulent viscosity if it drops below a physiological floor ($\nu_{t,\text{target}} = 0.01$) across the collocation points:
 \begin{equation}
-\mathcal{L}_{\nu_t} = \frac{\lambda_{\nu_t}}{N_c} \sum_i \max(0, \nu_{t,\text{target}} - \nu_{t,\text{bar}}(\mathbf{x}_i))^2.
+\mathcal{L}_{\nu_t} = \lambda_{\nu_t} \max\left(0, \nu_{t,\text{target}} - \frac{1}{N_c} \sum_i \nu_{t,\text{bar}}(\mathbf{x}_i)\right)^2.
 \end{equation}
 This is combined with the main loss with a fixed weight $\lambda_{\nu_t}$.
 
-\subsubsection{Total Loss and Weight Schedule}
+\subsubsection{Bounded Adaptive Weighting and Total Loss}
 
+The total loss is computed as a weighted sum of individual loss components:
 \begin{equation}
-\mathcal{L} = \lambda_{\text{WSS}}\mathcal{L}_{\text{WSS}} + \lambda_p \mathcal{L}_p + \lambda_{\text{wall}}\mathcal{L}_{\text{wall}} + \lambda_{\text{inlet}}\mathcal{L}_{\text{inlet}} + \lambda_{\text{outlet}}\mathcal{L}_{\text{outlet}} + \lambda_{\text{phys}}(e)\,\mathcal{L}_{\text{physics}} + \mathcal{L}_{\nu_t}.
+\mathcal{L} = \lambda_{\text{WSS}}\mathcal{L}_{\text{WSS}} + \lambda_p \mathcal{L}_p + \lambda_{\text{wall}}\mathcal{L}_{\text{wall}} + \lambda_{\text{inlet}}\mathcal{L}_{\text{inlet}} + \lambda_{\text{outlet}}\mathcal{L}_{\text{outlet}} + \lambda_{\text{phys}}\,\mathcal{L}_{\text{physics}} + \mathcal{L}_{\nu_t}.
 \end{equation}
-Representative weights: $\lambda_{\text{WSS}}=\lambda_p=1$, $\lambda_{\text{wall}}=\lambda_{\text{inlet}}=\lambda_{\text{outlet}}=10$, $\lambda_{\text{phys}}(e)$ ramped from $0.001$ to $1$ over the first $E_{\text{ramp}}$ epochs (e.g.\ $E_{\text{ramp}}=3000$). This keeps the physics residual as a regulariser early in training and strengthens it once the flow field has aligned with the data.
+To effectively balance these constraints throughout training, we employ a gradient-norm based adaptive weighting scheme (inspired by Wang et al.\ 2021) which updates the weights dynamically to prevent boundary conditions from overwhelming the physics loss. Crucially, we introduce two bounding mechanisms to this adaptive scheme: a \emph{physics weight floor} ($\lambda_{\text{phys}} \ge 0.1$) to ensure the PDE constraints are never ignored, and a \emph{weight cap} (e.g., capped at 20.0) to prevent the relatively easier boundary conditions (inlet, outlet, no-slip) from artificially inflating and suppressing the interior residual learning.
 
 Figure~\ref{fig:loss_schematic} summarises the loss composition.
 
@@ -314,9 +315,9 @@ Figure~\ref{fig:loss_schematic} summarises the loss composition.
 \label{sec:training}
 %==============================================================================
 
-\subsubsection{Optimisers and Scheduler}
+\subsubsection{Alternating Optimisation for Turbulent Viscosity}
 
-We use two separate AdamW optimisers: one for the parameters of the four flow networks ($u,v,w,p$), and one for the $\nu_t$ network. The flow parameters are updated using the full loss $\mathcal{L}$ (all data, boundary, and physics terms). The $\nu_t$ parameters are updated using only $\mathcal{L}_{\text{physics}} + \mathcal{L}_{\nu_t}$, so that the turbulent viscosity receives a direct gradient signal from the PDE residual and the regulariser, avoiding being overwhelmed by data gradients. The flow learning rate is set to a base value (e.g.\ $10^{-4}$) and the $\nu_t$ learning rate to a multiple (e.g.\ 10$\times$) of that. Both learning rates are decayed with a cosine annealing schedule to a minimum over the total number of epochs (e.g.\ 10,000). Gradient clipping (max norm 1) is applied to avoid instability when computing second derivatives for the momentum residual.
+We use an alternating optimisation strategy with two separate AdamW optimisers: one for the parameters of the four flow networks ($u,v,w,p$), and one for the $\nu_t$ network. Standard joint optimisation fails because the network tends to collapse the turbulent viscosity to zero ($\nu_t = 0$), effectively reverting to a laminar flow regime to easily satisfy data losses. To solve this, we decouple the $\nu_t$ network from the flow networks. The flow parameters are updated using the full loss $\mathcal{L}$ (all data, boundary, and physics terms). The $\nu_t$ parameters are updated using only $\mathcal{L}_{\text{physics}} + \mathcal{L}_{\nu_t}$, ensuring the turbulent viscosity receives a direct, uncontaminated gradient signal from the PDE residual and its regulariser. The flow learning rate is set to a base value (e.g.\ $10^{-4}$) and the $\nu_t$ learning rate to a multiple (e.g.\ 10$\times$) of that. Both learning rates are decayed with a cosine annealing schedule to a minimum over the total number of epochs (10,000). Gradient clipping (max norm 1) is applied to avoid instability when computing second derivatives.
 
 \subsubsection{Data and Collocation Sampling}
 
@@ -483,6 +484,14 @@ Computational performance represents a critical consideration for clinical trans
 When compared to the reference CFD simulations, which demanded 8--12 hours per configuration to compute 2000 time steps, the PINN offers near-instantaneous inference once the initial training investment has been made. This distinction becomes particularly pronounced in scenarios requiring repeated queries, such as parametric studies or real-time clinical decision support, where the PINN provides speedups exceeding three orders of magnitude. The trained network thus enables interactive exploration of haemodynamic fields, potentially transforming clinical workflows by allowing physicians to query flow characteristics and WSS patterns whilst consulting with patients.
 
 \section{Discussion}
+
+\subsection{The Challenge of Learning RANS from Sparse Data}
+
+Inferring volumetric turbulent viscosity ($\nu_t$) using only surface measurements (wall WSS and pressure) presents a significant challenge for PINNs. In traditional CFD, $\nu_t$ is resolved using complex $k$--$\omega$ transport equations integrated over the entire domain. In our framework, the PINN must learn this turbulent field implicitly through the momentum residuals. Standard joint optimisation fails in this scenario, as the network invariably collapses the turbulent viscosity to zero (reverting to a laminar flow regime) to more easily satisfy the boundary data losses. The model successfully learns the RANS physics only through the introduction of the alternating optimiser strategy, combined with the lower-bound regularisation and adaptive weight bounding.
+
+\subsection{Importance of Explicit Boundary Conditions}
+
+Beyond standard no-slip walls, providing explicit, time-dependent inlet velocity profiles and zero-pressure outlet conditions proved essential to constrain the internal flow field. Even without interior velocity supervision, explicitly enforcing the velocity magnitude at the inlet and pressure at the outlet allows the PINN to properly resolve complex internal haemodynamics. Without these bounding constraints, the network struggles to accurately capture critical internal features, such as the recirculation zones within the aneurysm sac.
 
 \subsection{Physics-Informed Learning Effectiveness}
 
