@@ -186,112 +186,126 @@ where $\sigma$ denotes the Swish activation ($\sigma(x) = x \cdot \mathrm{sigmoi
 
 \begin{figure}[t]
 \centering
+\resizebox{\textwidth}{!}{
 \begin{tikzpicture}[
-  node distance=0.6cm and 0.7cm,
-  input/.style={rectangle, draw, fill=blue!10, minimum width=2.4cm, minimum height=0.7cm, font=\small},
-  fourier/.style={rectangle, draw, fill=cyan!12, minimum width=2.4cm, minimum height=0.6cm, font=\small},
-  net/.style={rectangle, draw, fill=green!15, minimum width=1.5cm, minimum height=0.55cm, font=\small},
-  outnode/.style={rectangle, draw, fill=orange!15, minimum width=1.1cm, minimum height=0.5cm, font=\small},
-  loss/.style={rectangle, draw, rounded corners, fill=red!8, minimum width=2.0cm, minimum height=0.55cm, font=\small},
-  physloss/.style={rectangle, draw, rounded corners, fill=green!10, minimum width=2.0cm, minimum height=0.55cm, font=\small},
-  derived/.style={rectangle, draw, dashed, fill=yellow!10, minimum width=1.4cm, minimum height=0.5cm, font=\scriptsize},
-  arrow/.style={-Stealth, thick},
-  thinArrow/.style={-Stealth, thin, gray}
-  ]
-  % Input
-  \node[input] (in) {$\mathbf{z} = (x_{\text{std}},y_{\text{std}},z_{\text{std}},t_{\text{phase}})$};
-  % Fourier
-  \node[fourier, below=0.4cm of in] (ff) {Fourier $\phi(\mathbf{z}) \in \mathbb{R}^{32}$};
-  \draw[arrow] (in) -- (ff);
+  >=stealth,
+  node distance=1.5cm and 1cm,
+  box/.style={draw, rounded corners, fill=white, minimum width=2cm, minimum height=1cm, align=center, thick},
+  net/.style={draw, rounded corners, fill=blue!10, minimum width=1.5cm, minimum height=0.6cm, align=center, thick},
+  loss/.style={draw, rounded corners, fill=red!10, minimum width=2.4cm, minimum height=1cm, align=center, thick},
+  arrow/.style={->, thick},
+  dashed_arrow/.style={->, thick, dashed}
+]
 
-  % Networks
-  \node[net, below left=0.6cm and 2.4cm of ff] (u) {Net$_u$};
-  \node[net, below left=0.6cm and 0.8cm of ff] (v) {Net$_v$};
-  \node[net, below=0.6cm of ff] (w) {Net$_w$};
-  \node[net, below right=0.6cm and 0.8cm of ff] (p) {Net$_p$};
-  \node[net, below right=0.6cm and 2.4cm of ff] (nut) {Net$_{\nu_t}$};
+% 1. Input
+\node[box, fill=gray!10] (input) {Input \\ $\mathbf{z} = (x, y, z, t)$};
 
-  \draw[arrow] (ff) -- (u);
-  \draw[arrow] (ff) -- (v);
-  \draw[arrow] (ff) -- (w);
-  \draw[arrow] (ff) -- (p);
-  \draw[arrow] (ff) -- (nut);
+% 2. Fourier
+\node[box, fill=cyan!10, right=1.2cm of input] (fourier) {Fourier \\ $\phi(\mathbf{z})$};
+\draw[arrow] (input) -- (fourier);
 
-  % Outputs
-  \node[outnode, below=0.4cm of u] (ou) {$u$};
-  \node[outnode, below=0.4cm of v] (ov) {$v$};
-  \node[outnode, below=0.4cm of w] (ow) {$w$};
-  \node[outnode, below=0.4cm of p] (op) {$p$};
-  \node[outnode, below=0.4cm of nut] (onu) {$\nu_t$};
+% 3. Networks
+\node[net, right=1.5cm of fourier, yshift=2.0cm] (netu) {Net$_u$};
+\node[net, below=0.3cm of netu] (netv) {Net$_v$};
+\node[net, below=0.3cm of netv] (netw) {Net$_w$};
+\node[net, below=0.3cm of netw] (netp) {Net$_p$};
+\node[net, below=0.3cm of netp, fill=orange!15] (netnut) {Net$_{\nu_t}$};
 
-  \draw[arrow] (u) -- (ou);
-  \draw[arrow] (v) -- (ov);
-  \draw[arrow] (w) -- (ow);
-  \draw[arrow] (p) -- (op);
-  \draw[arrow] (nut) -- (onu);
+\draw[arrow] (fourier.east) -- ++(0.5,0) |- (netu.west);
+\draw[arrow] (fourier.east) -- ++(0.5,0) |- (netv.west);
+\draw[arrow] (fourier.east) -- ++(0.5,0) |- (netw.west);
+\draw[arrow] (fourier.east) -- ++(0.5,0) |- (netp.west);
+\draw[arrow] (fourier.east) -- ++(0.5,0) |- (netnut.west);
 
-  % Derived WSS
-  \node[derived, below=0.5cm of ov] (wss) {WSS (derived)};
-  \draw[thinArrow] (ou.south) -- ++(0,-0.3) -| (wss.north west);
-  \draw[thinArrow] (ov.south) -- (wss.north);
-  \draw[thinArrow] (ow.south) -- ++(0,-0.3) -| (wss.north east);
+% 4. Outputs
+\node[right=0.8cm of netu] (u) {$u$};
+\node[right=0.8cm of netv] (v) {$v$};
+\node[right=0.8cm of netw] (w) {$w$};
+\node[right=0.8cm of netp] (p) {$p$};
+\node[right=0.8cm of netnut] (nut) {$\nu_t$};
 
-  % Loss boxes
-  \node[loss, below=1.3cm of ow] (dataloss) {Data/BC Loss};
-  \node[physloss, below=1.3cm of onu] (physloss) {Physics Loss};
+\draw[arrow] (netu) -- (u);
+\draw[arrow] (netv) -- (v);
+\draw[arrow] (netw) -- (w);
+\draw[arrow] (netp) -- (p);
+\draw[arrow] (netnut) -- (nut);
 
-  \draw[thinArrow] (wss.south) -- ++(0,-0.15) -| (dataloss.north);
-  \draw[thinArrow] (op.south) -- ++(0,-0.8) -| (dataloss.north east);
-  \draw[thinArrow] (onu.south) -- ++(0,-0.8) -| (physloss.north);
+\node[draw, dashed, inner sep=0.15cm, fit=(u)(v)(w), label=above:\small Velocity $\mathbf{u}$] (vel) {};
 
-  % Annotations
-  \node[above=0.1cm of in, font=\scriptsize, gray] {Shared input};
-  \node[right=0.15cm of onu, font=\scriptsize, gray] {softplus};
-  \node[below=0.05cm of wss, font=\scriptsize, gray] {$\nabla \mathbf{u} \cdot \mathbf{n}$};
+% 5. Derivatives (Autograd)
+\node[box, fill=yellow!15, right=1.5cm of vel] (wss) {WSS \& \\ Traction};
+\node[box, fill=yellow!15, right=1.5cm of p, yshift=-1.0cm, minimum height=1.2cm] (pde) {RANS PDE \\ Residuals};
+
+\draw[arrow] (vel.east) -- (wss.west);
+\draw[dashed_arrow] (nut.east) -| ++(0.4, 2.5) -- (wss.west);
+
+\draw[arrow] (vel.east) -| (pde.north);
+\draw[arrow] (p.east) -| (pde.north);
+\draw[arrow] (nut.east) -| (pde.north);
+
+% 6. Loss Functions
+\node[loss, right=1.2cm of wss] (lossdata) {Data \& BCs \\ $\mathcal{L}_{\text{WSS}}, \mathcal{L}_p, \mathcal{L}_{\text{wall}}$};
+\node[loss, fill=green!15, right=1.2cm of pde] (lossphys) {Physics \\ $\mathcal{L}_{\text{RANS}}, \mathcal{L}_{\nu_t}$};
+
+\draw[arrow] (wss.east) -- (lossdata.west);
+\draw[arrow] (p.east) -| ++(0.6, 2.2) -- (lossdata.west);
+\draw[arrow] (pde.east) -- (lossphys.west);
+
 \end{tikzpicture}
+}
 \caption{High-level PINN architecture. A shared input $\mathbf{z}$ is mapped through Fourier feature encoding and then fed into five independent networks. The three velocity outputs ($u$, $v$, $w$) are used to derive WSS via automatic differentiation of the stress tensor at the wall; WSS is not a separate network output. Data and boundary losses operate on wall predictions, while the physics loss enforces RANS residuals at interior collocation points using all five outputs.}
 \label{fig:arch_overview}
 \end{figure}
 
 \begin{figure}[t]
 \centering
+\resizebox{\textwidth}{!}{
 \begin{tikzpicture}[
-  node distance=0.45cm,
-  block/.style={rectangle, draw, minimum height=1.0cm, minimum width=1.3cm, font=\small, align=center},
-  arrow/.style={-Stealth, thick},
-  dim/.style={font=\scriptsize, gray, align=center}
-  ]
-  % Main pipeline left-to-right
-  \node[block, fill=blue!12]   (z)    {Input\\$\mathbf{z}$};
-  \node[block, fill=cyan!15,   right=of z]             (ff)   {Fourier\\$\phi(\mathbf{z})$};
-  \node[block, fill=green!12,  right=of ff]            (enc)  {Linear\\+~Swish};
-  \node[block, fill=green!12,  right=of enc]           (r1)   {Res-\\Block~1};
-  \node[right=0.3cm of r1,    font=\normalsize]        (dots) {$\cdots$};
-  \node[block, fill=green!12,  right=0.3cm of dots]    (rL)   {Res-\\Block~$L$};
-  \node[block, fill=orange!12, right=of rL]            (dec)  {Linear};
-  \node[block, fill=yellow!15, right=of dec]           (out)  {Scalar\\output};
-  % Arrows
-  \draw[arrow] (z)    -- (ff);
-  \draw[arrow] (ff)   -- (enc);
-  \draw[arrow] (enc)  -- (r1);
-  \draw[arrow] (r1)   -- (dots);
-  \draw[arrow] (dots) -- (rL);
-  \draw[arrow] (rL)   -- (dec);
-  \draw[arrow] (dec)  -- (out);
-  % Dimension labels below each block
-  \node[dim, below=0.1cm of z]   {$\mathbb{R}^4$};
-  \node[dim, below=0.1cm of ff]  {$\mathbb{R}^{32}$};
-  \node[dim, below=0.1cm of enc] {$\mathbb{R}^H$};
-  \node[dim, below=0.1cm of r1]  {$\mathbb{R}^H$};
-  \node[dim, below=0.1cm of rL]  {$\mathbb{R}^H$};
-  \node[dim, below=0.1cm of dec] {$\mathbb{R}^1$};
-  % ResBlock formula below the chain
-  \node[font=\scriptsize, below=0.75cm of dots, align=center]
-       {ResBlock: $\;\mathbf{h} \leftarrow \mathbf{h} + \mathbf{W}_2\,\sigma(\mathbf{W}_1\,\mathbf{h})$\quad (no outer activation)};
-  % Branch-specific note
-  \node[font=\scriptsize, gray, below=1.3cm of dec, align=center]
-       {Flow: $H{=}128$,\;$L{=}6$\quad $\nu_t$: $H{=}64$,\;$L{=}4$, softplus output};
+  >=stealth,
+  node distance=0.6cm,
+  block/.style={draw, rounded corners, minimum height=0.8cm, minimum width=1.5cm, fill=white, thick, align=center},
+  arrow/.style={->, thick},
+  dim/.style={font=\scriptsize, text=gray}
+]
+
+\node[block, fill=blue!10] (in) {Input $\mathbf{z}$};
+\node[block, fill=cyan!10, right=of in] (ff) {Fourier $\phi$};
+\node[block, fill=green!10, right=of ff] (enc) {Linear \\ + Swish};
+\node[block, fill=green!10, right=of enc] (r1) {ResBlock 1};
+\node[right=0.2cm of r1, font=\Large] (dots) {$\dots$};
+\node[block, fill=green!10, right=0.2cm of dots] (rL) {ResBlock $L$};
+\node[block, fill=orange!10, right=of rL] (dec) {Linear};
+\node[block, fill=yellow!15, right=of dec] (out) {Scalar \\ Output};
+
+\draw[arrow] (in) -- (ff);
+\draw[arrow] (ff) -- (enc);
+\draw[arrow] (enc) -- (r1);
+\draw[arrow] (r1) -- (dots);
+\draw[arrow] (dots) -- (rL);
+\draw[arrow] (rL) -- (dec);
+\draw[arrow] (dec) -- (out);
+
+\node[dim, below=0.1cm of in] {$\mathbb{R}^4$};
+\node[dim, below=0.1cm of ff] {$\mathbb{R}^{32}$};
+\node[dim, below=0.1cm of enc] {$\mathbb{R}^H$};
+\node[dim, below=0.1cm of r1] {$\mathbb{R}^H$};
+\node[dim, below=0.1cm of rL] {$\mathbb{R}^H$};
+\node[dim, below=0.1cm of dec] {$\mathbb{R}^1$};
+
+\node[below=1.2cm of r1, align=left, anchor=west, xshift=-1cm, font=\small, draw, dashed, inner sep=0.2cm] (res) {
+    \textbf{Residual Block Formulation:}\\
+    $\mathbf{h}^{(\ell+1)} = \mathbf{h}^{(\ell)} + \mathbf{W}_2^{(\ell)} \sigma(\mathbf{W}_1^{(\ell)} \mathbf{h}^{(\ell)})$ \\
+    \textit{(No outer activation)}
+};
+
+\node[below=1.2cm of rL, align=left, anchor=east, xshift=1cm, font=\small, draw, dashed, inner sep=0.2cm] (params) {
+    \textbf{Branch Hyperparameters:}\\
+    Flow ($u,v,w,p$): $H=128$, $L=6$ \\
+    Turbulence ($\nu_t$): $H=64$, $L=4$
+};
+
 \end{tikzpicture}
+}
 \caption{Single network branch laid out left to right: the 4D input $\mathbf{z}$ is mapped through Fourier features ($\mathbb{R}^{32}$), a linear encoder with Swish activation, a stack of $L$ residual blocks (all at hidden dimension $H$), and a linear decoder to one scalar. Each residual block applies $\mathbf{h} + \mathbf{W}_2\,\sigma(\mathbf{W}_1\,\mathbf{h})$ without an outer activation. Flow branches use $H=128$, $L=6$; the $\nu_t$ branch uses $H=64$, $L=4$ with a softplus output transform.}
 \label{fig:arch_branch}
 \end{figure}
@@ -376,62 +390,56 @@ Figure~\ref{fig:loss_schematic} provides an overview of how the individual losse
 
 \begin{figure}[t]
 \centering
+\resizebox{\textwidth}{!}{
 \begin{tikzpicture}[
-        x=1cm, y=1cm,
-        lossbox/.style={rectangle, draw, rounded corners, minimum width=1.85cm, minimum height=0.58cm, font=\small, align=center},
-        optbox/.style={rectangle, draw, rounded corners, thick, minimum width=3.0cm, minimum height=0.65cm, font=\small, align=center},
-        sumbox/.style={rectangle, draw, rounded corners, thick, fill=gray!6, minimum width=5.8cm, minimum height=0.76cm, font=\small, align=center},
-        arrow/.style={-Stealth, thick},
-        thinArrow/.style={-Stealth, semithick, gray!70}
+        >=stealth,
+        lossbox/.style={draw, rounded corners, minimum width=2.0cm, minimum height=0.7cm, font=\small, align=center},
+        optbox/.style={draw, rounded corners, thick, minimum width=3.5cm, minimum height=0.8cm, font=\small, align=center},
+        sumbox/.style={draw, rounded corners, thick, fill=gray!10, minimum width=6cm, minimum height=0.8cm, font=\small, align=center},
+        arrow/.style={->, thick},
+        thinArrow/.style={->, semithick, gray}
   ]
         % Top row: data and boundary losses
-        \node[lossbox, fill=red!12]    (Lwss)  at (-4.2, 2.2) {$\mathcal{L}_{\text{WSS}}$};
-        \node[lossbox, fill=red!12]    (Lp)    at (-2.1, 2.2) {$\mathcal{L}_p$};
-        \node[lossbox, fill=orange!12] (Lwall) at ( 0.0, 2.2) {$\mathcal{L}_{\text{wall}}$};
-        \node[lossbox, fill=orange!12] (Lin)   at ( 2.1, 2.2) {$\mathcal{L}_{\text{in}}$};
-        \node[lossbox, fill=orange!12] (Lout)  at ( 4.2, 2.2) {$\mathcal{L}_{\text{out}}$};
+        \node[lossbox, fill=red!10]    (Lwss)  at (-4.8, 2.5) {$\mathcal{L}_{\text{WSS}}$};
+        \node[lossbox, fill=red!10]    (Lp)    at (-2.4, 2.5) {$\mathcal{L}_p$};
+        \node[lossbox, fill=orange!15] (Lwall) at ( 0.0, 2.5) {$\mathcal{L}_{\text{wall}}$};
+        \node[lossbox, fill=orange!15] (Lin)   at ( 2.4, 2.5) {$\mathcal{L}_{\text{in}}$};
+        \node[lossbox, fill=orange!15] (Lout)  at ( 4.8, 2.5) {$\mathcal{L}_{\text{out}}$};
 
         % Second row: physics + regularisation
-        \node[lossbox, fill=green!15]  (Lphys) at (-1.2, 1.25) {$\mathcal{L}_{\text{physics}}$};
-        \node[lossbox, fill=blue!10]   (Lnut)  at ( 1.2, 1.25) {$\mathcal{L}_{\nu_t}$};
+        \node[lossbox, fill=green!15]  (Lphys) at (-1.5, 1.2) {$\mathcal{L}_{\text{physics}}$};
+        \node[lossbox, fill=blue!10]   (Lnut)  at ( 1.5, 1.2) {$\mathcal{L}_{\nu_t}$};
 
         % Adaptive weighting note
-        \node[font=\scriptsize, gray] at (0.0, 2.9) {$\lambda_i^{\text{adapt}}$ (gradient-norm balanced)};
+        \node[font=\footnotesize, gray] at (0.0, 3.2) {$\lambda_i^{\text{adapt}}$ (gradient-norm balanced)};
 
         % Aggregate objective + optimisers
-        \node[sumbox] (Ltotal) at (0.0, 0.2) {$\mathcal{L}_{\text{total}} = \sum_i \lambda_i\,\mathcal{L}_i$};
-        \node[optbox, fill=green!8] (flowopt) at (-2.0, -1.15) {Flow Optimiser ($u,v,w,p$)};
-        \node[optbox, fill=blue!8]  (nutopt)  at ( 2.3, -1.15) {$\nu_t$ Optimiser};
-
-        % Grouped routing points (reduces clutter)
-        \coordinate (hubL) at (-1.9, 0.85);
-        \coordinate (hubC) at ( 0.0, 0.92);
-        \coordinate (hubR) at ( 1.9, 0.85);
+        \node[sumbox] (Ltotal) at (0.0, 0.0) {$\mathcal{L}_{\text{total}} = \sum_i \lambda_i\,\mathcal{L}_i$};
+        
+        \node[optbox, fill=green!10] (flowopt) at (-2.5, -1.5) {Flow Optimiser \\ ($u, v, w, p$)};
+        \node[optbox, fill=blue!10]  (nutopt)  at ( 2.5, -1.5) {$\nu_t$ Optimiser \\ (Turbulent Viscosity)};
 
         % Routing to total loss
-        \draw[thinArrow] (Lwss.south)  -- (hubL);
-        \draw[thinArrow] (Lp.south)    -- (hubL);
-        \draw[thinArrow] (Lwall.south) -- (hubC);
-        \draw[thinArrow] (Lin.south)   -- (hubR);
-        \draw[thinArrow] (Lout.south)  -- (hubR);
-        \draw[thinArrow] (Lphys.south) -- (hubC);
-        \draw[thinArrow] (Lnut.south)  -- (hubC);
-
-        \draw[thinArrow] (hubL) -- (Ltotal.north west);
-        \draw[thinArrow] (hubC) -- (Ltotal.north);
-        \draw[thinArrow] (hubR) -- (Ltotal.north east);
+        \draw[thinArrow] (Lwss.south)  -- ++(0,-0.4) -| (Ltotal.160);
+        \draw[thinArrow] (Lp.south)    -- ++(0,-0.4) -| (Ltotal.140);
+        \draw[thinArrow] (Lwall.south) -- (Ltotal.north);
+        \draw[thinArrow] (Lin.south)   -- ++(0,-0.4) -| (Ltotal.40);
+        \draw[thinArrow] (Lout.south)  -- ++(0,-0.4) -| (Ltotal.20);
+        \draw[thinArrow] (Lphys.south) -- ++(0,-0.2) -| (Ltotal.100);
+        \draw[thinArrow] (Lnut.south)  -- ++(0,-0.2) -| (Ltotal.80);
 
         % Optimiser update paths
-        \draw[arrow] (Ltotal.south) -- (flowopt.north);
-        \draw[arrow, blue!60] (Lphys.east) -- ++(2.8,0) -- ++(0,-2.05) -- (nutopt.north east);
-        \draw[arrow, blue!60] (Lnut.east)  -- ++(1.1,0) -- ++(0,-2.05) -- (nutopt.north west);
+        \draw[arrow] (Ltotal.south) -| (flowopt.north);
+        
+        % Nu_t paths bypassing total loss (routed to the far right)
+        \draw[arrow, blue, dashed] (Lphys.east) -| (6.2, 0.6) |- (nutopt.east);
+        \draw[arrow, blue, dashed] (Lnut.east) -| (6.0, 0.6) |- (nutopt.east);
 
         % Labels and legend
-        \node[font=\scriptsize, gray]    at (-3.4, -0.55) {all losses};
-        \node[font=\scriptsize, blue!60] at ( 4.05, -0.55) {physics only};
-        \node[font=\scriptsize, red!70]    at (-5.1, 2.65) {data};
-        \node[font=\scriptsize, orange!70] at ( 3.35, 2.65) {BCs};
+        \node[font=\footnotesize, gray]    at (-3.5, -0.6) {all losses $\to$};
+        \node[font=\footnotesize, blue] at ( 5.5, -0.6) {physics \& $\nu_t$ $\to$};
 \end{tikzpicture}
+}
 \caption{Loss composition and dual-optimiser routing. Data terms (WSS, pressure) and boundary terms (no-slip, inlet, outlet) are combined with the physics residual and $\nu_t$ regularisation via adaptive weights. All terms flow to the flow optimiser that updates $u,v,w,p$; only the physics loss and $\nu_t$ regularisation update the turbulent viscosity network.}
 \label{fig:loss_schematic}
 \end{figure}
