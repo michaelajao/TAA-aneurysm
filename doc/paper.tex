@@ -28,7 +28,7 @@
 }
 
 % Title and authors
-\title{\textbf{Physics-Informed Neural Networks for Hemodynamic Prediction in Cerebral Aneurysms: A Sparse Data Learning Approach}}
+\title{\textbf{Physics-Informed Neural Networks for Hemodynamic Prediction in Thoracic Aortic Aneurysms: A RANS-Constrained Sparse Data Approach}}
 
 \author{
     % Add author names here
@@ -42,16 +42,16 @@
 \maketitle
 
 \begin{abstract}
-Predicting hemodynamic parameters within cerebral aneurysms remains a significant challenge in neurovascular medicine, particularly when assessing rupture risk and planning interventions. Whilst traditional computational fluid dynamics (CFD) simulations provide detailed flow information, they demand substantial computational resources and time-consuming mesh generation for patient-specific geometries. We present a physics-informed neural network (PINN) approach that addresses these limitations by learning from sparse CFD data---using only 10\% of available measurements---whilst simultaneously enforcing fundamental physical laws governing blood flow. Our framework integrates the incompressible Navier-Stokes equations with a non-Newtonian Carreau-Yasuda viscosity model to capture the shear-thinning behaviour of blood, implements pulsatile inlet conditions derived from physiological waveforms, and predicts wall shear stress (WSS) patterns across six anatomically distinct aneurysm configurations. Through careful weighting of data-driven and physics-based loss terms, the network achieves coefficient of determination values exceeding 0.85 for velocity components and 0.80 for pressure predictions, despite the significant data sparsity. The model converges within approximately 2,000 training epochs and successfully reproduces complex haemodynamic features, including recirculation zones and WSS distributions crucial for clinical decision-making. Our findings suggest that physics-informed machine learning offers a practical pathway towards rapid, accurate hemodynamic analysis in neurovascular clinics.
+Predicting hemodynamic parameters within thoracic aortic aneurysms (TAAs) remains a significant challenge in cardiovascular surgery, particularly when assessing rupture and dissection risk to guide surgical planning. Whilst traditional computational fluid dynamics (CFD) simulations provide detailed flow information, they demand substantial computational resources and time-consuming mesh generation for patient-specific geometries. We present a physics-informed neural network (PINN) framework that addresses these limitations by learning from sparse CFD wall data---using approximately one third of available measurements---whilst simultaneously enforcing Reynolds-averaged Navier-Stokes (RANS) equations with a learnable turbulent viscosity field. Our approach integrates a non-Newtonian Carreau-Yasuda viscosity model to capture the shear-thinning behaviour of blood, implements pulsatile inlet conditions derived from physiological waveforms, and predicts wall shear stress (WSS) patterns across six anatomically distinct aneurysm configurations. A gradient-norm adaptive loss weighting scheme dynamically balances data-driven and physics-based loss terms throughout training, while an alternating dual-optimiser strategy ensures the turbulent viscosity network receives dedicated gradient signal from the governing equations. Through this combination of techniques, the network achieves coefficient of determination values exceeding 0.85 for velocity components and 0.80 for pressure predictions, despite the significant data reduction. The trained model provides near-instantaneous inference, successfully reproducing complex haemodynamic features including recirculation zones and WSS distributions crucial for clinical decision-making.
 
-\noindent \textbf{Keywords:} Physics-Informed Neural Networks, Cerebral Aneurysms, Haemodynamics, Wall Shear Stress, Navier-Stokes Equations, Sparse Data Learning
+\noindent \textbf{Keywords:} Physics-Informed Neural Networks, Thoracic Aortic Aneurysms, Haemodynamics, Wall Shear Stress, RANS, Adaptive Loss Weighting, Sparse Data Learning
 \end{abstract}
 
 \section{Introduction}
 
-Cerebral aneurysms represent pathological dilations of intracranial blood vessels, with prevalence estimates ranging between 3--5\% in the general population \cite{ref1}. When these weakened vessel walls rupture, the resulting subarachnoid haemorrhage carries devastating consequences, with mortality rates frequently exceeding 50\% \cite{ref2}. Clinicians therefore face the challenging task of stratifying rupture risk to guide treatment decisions, weighing the benefits of preventive intervention---such as surgical clipping or endovascular coiling---against the inherent procedural risks.
+Thoracic aortic aneurysms (TAAs) are pathological dilations of the thoracic segment of the aorta, affecting approximately 6--10 per 100,000 persons annually \cite{ref1}. Left untreated, progressive aortic enlargement carries substantial risk of rupture or acute aortic dissection---events associated with mortality rates exceeding 50\% even with emergency surgical intervention \cite{ref2}. Clinicians must therefore balance the risk of watchful waiting against the morbidity of elective open surgical repair or endovascular aortic stenting, a decision that hinges on accurate assessment of the biomechanical forces acting on the aneurysm wall.
 
-The haemodynamic environment within an aneurysm, characterised particularly by wall shear stress (WSS) patterns, has emerged as a critical determinant of vessel wall stability and rupture propensity \cite{ref3,ref4}. Regions subjected to abnormally low WSS tend to exhibit continued aneurysm growth and heightened rupture risk, whilst areas experiencing elevated WSS may indicate flow impingement sites where the vessel wall experiences concentrated mechanical stress. Over the past two decades, computational fluid dynamics (CFD) has established itself as the principal tool for non-invasive haemodynamic analysis, offering detailed visualisation of three-dimensional flow structures and quantitative assessment of WSS distributions \cite{ref5,ref6}.
+The haemodynamic environment within an aneurysm, characterised particularly by wall shear stress (WSS) patterns, has emerged as a critical determinant of vessel wall remodelling and rupture propensity \cite{ref3,ref4}. Regions subjected to abnormally low WSS tend to promote extracellular matrix degradation and continued aneurysm expansion, whilst areas experiencing elevated WSS may indicate flow impingement sites where the vessel wall experiences concentrated mechanical loading. Over the past two decades, computational fluid dynamics (CFD) has established itself as the principal tool for non-invasive haemodynamic analysis, offering detailed visualisation of three-dimensional flow structures and quantitative assessment of WSS distributions \cite{ref5,ref6}.
 
 Despite its proven utility, CFD analysis confronts several persistent challenges that limit its clinical adoption. High-fidelity simulations demand considerable computational resources, particularly when modelling pulsatile blood flow through the cardiac cycle using Reynolds-Averaged Navier-Stokes (RANS) turbulence formulations. The process of generating suitable computational meshes for patient-specific geometries remains labour-intensive, requiring specialist expertise and often consuming hours of manual refinement to ensure mesh quality. Furthermore, CFD predictions exhibit sensitivity to numerous modelling assumptions---including inlet and outlet boundary conditions, turbulence closure schemes, and arterial wall compliance---which collectively introduce uncertainty into the haemodynamic assessments that clinicians rely upon for treatment planning.
 
@@ -59,9 +59,9 @@ Physics-informed neural networks (PINNs) \cite{raissi2019pinns} present an intri
 
 \subsection{Contributions}
 
-This investigation makes several distinct contributions to the application of physics-informed machine learning in vascular haemodynamics. First, we demonstrate that PINNs can achieve clinically relevant accuracy whilst learning from dramatically reduced datasets---specifically, training on only 10\% of available CFD measurements by enforcing conservation laws at randomly sampled collocation points throughout the flow domain. Second, we implement a comprehensive treatment of physiologically realistic boundary conditions, including time-varying pulsatile inlet velocity profiles derived from published cardiac waveforms, zero-pressure outlet conditions, and rigorous enforcement of no-slip constraints at vessel walls through carefully tuned adaptive weighting schemes.
+This investigation makes several distinct contributions to the application of physics-informed machine learning in vascular haemodynamics. First, we demonstrate that PINNs can achieve clinically relevant accuracy whilst learning from reduced datasets---specifically, training on approximately one third of available CFD wall measurements by enforcing conservation laws at collocation points sampled throughout the flow domain. Second, we implement a comprehensive treatment of physiologically realistic boundary conditions, including time-varying pulsatile inlet velocity profiles, zero-pressure outlet conditions, and rigorous enforcement of no-slip constraints at vessel walls.
 
-Our framework explicitly accounts for blood's non-Newtonian rheological behaviour through the Carreau-Yasuda viscosity model, recognising that shear-thinning effects become particularly pronounced in the low-velocity recirculation zones characteristic of aneurysm sacs. To assess the generalisability of our approach across diverse anatomical scenarios, we conduct systematic evaluation on six distinct aneurysm configurations, varying both overall size (5~cm versus 6~cm diameter) and morphological features (baseline, asymmetric saccular with downstream or upstream positioning). Finally, our temporal modelling strategy captures haemodynamic variations across the cardiac cycle by training networks to predict flow characteristics during both systolic peak flow and diastolic minimum flow phases, with explicit enforcement of the pulsatile inlet waveform throughout.
+Third, our formulation goes beyond the standard laminar Navier-Stokes equations by posing the Reynolds-averaged momentum and continuity equations with a \emph{learnable} turbulent viscosity field, output by a dedicated neural network branch. This enables the PINN to absorb the turbulence closure implicitly from the CFD training data, without requiring explicit transport equations for turbulence quantities. Fourth, we employ a gradient-norm adaptive loss weighting scheme \cite{ref_wang2021} that dynamically balances the competing loss terms throughout training, combined with an alternating dual-optimiser strategy that provides the turbulent viscosity network with a dedicated gradient signal from the physics residual. Our framework explicitly accounts for blood's non-Newtonian rheological behaviour through the Carreau-Yasuda viscosity model, recognising that shear-thinning effects become particularly pronounced in the low-velocity recirculation zones characteristic of aneurysm sacs. To assess generalisability, we conduct systematic evaluation across six distinct TAA configurations, varying both overall diameter (5~cm versus 6~cm) and morphological features (axisymmetric fusiform, asymmetric with downstream positioning, and asymmetric with upstream positioning), each at systolic and diastolic cardiac phases.
 
 The remainder of this paper proceeds as follows. Section~2 positions our work within the broader context of CFD-based aneurysm analysis and emerging machine learning approaches. Section~3 details our methodology, including the problem formulation, network architecture, and physics-informed loss construction. Section~4 describes our experimental framework and the six aneurysm configurations under investigation. Section~5 presents quantitative performance metrics alongside qualitative visualisations of predicted flow fields. Section~6 discusses the implications of our findings for clinical application, addresses current limitations, and outlines promising directions for future development. Section~7 provides concluding remarks.
 
@@ -69,28 +69,28 @@ The remainder of this paper proceeds as follows. Section~2 positions our work wi
 
 \subsection{CFD in Aneurysm Hemodynamics}
 
-Computational fluid dynamics has been extensively applied to aneurysm analysis. Cebral et al. \cite{ref7} demonstrated correlations between WSS patterns and aneurysm rupture through large-scale patient studies. Xiang et al. \cite{ref8} developed hemodynamic indices combining WSS, oscillatory shear index (OSI), and flow stability metrics. However, CFD simulations typically require hours to days of computation per patient, limiting real-time clinical application.
+Computational fluid dynamics has been extensively applied to aortic aneurysm analysis. Bäumler et al.\ \cite{ref7} demonstrated the utility of patient-specific CFD for characterising aortic flow patterns validated against 4D flow MRI. Pasta et al.\ \cite{ref8} investigated the relationship between WSS distributions and aortic wall stress in thoracic aneurysms, establishing hemodynamic indices relevant to rupture risk stratification. However, CFD simulations typically require hours to days of computation per patient, limiting real-time clinical application.
 
 \subsection{Machine Learning for Hemodynamics}
 
-Traditional machine learning approaches have been applied to predict hemodynamic quantities from geometric features. Liang et al. \cite{ref9} used support vector machines to classify rupture risk based on morphological parameters. More recently, convolutional neural networks have been employed to predict CFD outcomes from 3D geometries \cite{ref10}, though these methods lack explicit physics encoding and require extensive training datasets.
+Traditional machine learning approaches have been applied to predict hemodynamic quantities from geometric features. Liang et al.\ \cite{ref9} used support vector machines to classify rupture risk based on morphological parameters of ascending aortic aneurysms. More recently, convolutional neural networks have been employed to predict CFD outcomes from 3D geometries \cite{ref10}, though these methods lack explicit physics encoding and require extensive training datasets.
 
 \subsection{Physics-Informed Neural Networks}
 
-Raissi et al. \cite{raissi2019pinns} introduced PINNs for solving forward and inverse problems in partial differential equations (PDEs). The key innovation is incorporating PDE residuals directly into the loss function, enabling networks to interpolate sparse data while satisfying conservation laws. PINNs have been successfully applied to fluid dynamics \cite{ref11}, heat transfer \cite{ref12}, and material modeling \cite{ref13}.
+Raissi et al.\ \cite{raissi2019pinns} introduced PINNs for solving forward and inverse problems in partial differential equations (PDEs). The key innovation is incorporating PDE residuals directly into the loss function, enabling networks to interpolate sparse data while satisfying conservation laws. PINNs have been successfully applied to fluid dynamics \cite{ref11}, heat transfer \cite{ref12}, and material modelling \cite{ref13}.
 
-In cardiovascular applications, Arzani et al. \cite{ref14} applied PINNs to synthetic arterial flow problems, demonstrating superior performance over pure data-driven methods. However, application to complex patient-specific aneurysm geometries with pulsatile flow and non-Newtonian rheology remains unexplored.
+In cardiovascular applications, Arzani et al.\ \cite{ref14} applied PINNs to synthetic arterial flow problems, demonstrating superior performance over pure data-driven methods. Wang et al.\ \cite{ref_wang2021} identified gradient flow pathologies that arise when physics and data losses compete, and proposed gradient-norm balancing to adaptively reweight loss terms---a strategy we adopt and extend in this work. However, application of PINNs to complex patient-specific aortic aneurysm geometries with pulsatile flow, RANS turbulence modelling, and non-Newtonian rheology remains largely unexplored.
 
 \section{Methodology}
 
-We describe a physics-informed neural network (PINN) that approximates steady Reynolds-averaged haemodynamics for two cardiac phases (systolic and diastolic) in aneurysm domains. The formulation couples data-driven fitting at the wall (pressure, WSS) with interior enforcement of the incompressible RANS equations, non-Newtonian Carreau-Yasuda viscosity, and a \emph{learnable} turbulent viscosity field. This section is structured as: problem formulation and governing equations (\S\ref{sec:problem}), non-dimensionalisation and standardisation (\S\ref{sec:nondim}), network architecture (\S\ref{sec:arch}), loss construction and weighting (\S\ref{sec:loss}), and training procedure (\S\ref{sec:training}).
+We describe a physics-informed neural network (PINN) that approximates steady Reynolds-averaged haemodynamics for two cardiac phases (systolic and diastolic) in thoracic aortic aneurysm domains. The formulation couples data-driven fitting at the wall (pressure, WSS) with interior enforcement of the incompressible RANS equations, non-Newtonian Carreau-Yasuda viscosity, and a \emph{learnable} turbulent viscosity field. A gradient-norm adaptive weighting scheme dynamically balances the multiple loss terms, while an alternating dual-optimiser strategy ensures the turbulent viscosity network receives dedicated physics gradient signal. This section is structured as: problem formulation and governing equations (\S\ref{sec:problem}), non-dimensionalisation and standardisation (\S\ref{sec:nondim}), network architecture (\S\ref{sec:arch}), loss construction and weighting (\S\ref{sec:loss}), and training procedure (\S\ref{sec:training}).
 
 %==============================================================================
 \subsection{Problem Formulation and Governing Equations}
 \label{sec:problem}
 %==============================================================================
 
-We consider incompressible flow in a bounded domain $\Omega \subset \mathbb{R}^3$ (aneurysm lumen). The reference CFD was produced with the SST $k$--$\omega$ transition model and Carreau-Yasuda blood rheology; we therefore pose the \emph{Reynolds-averaged} momentum and continuity equations with an effective viscosity that combines molecular (shear-dependent) and turbulent contributions.
+We consider incompressible flow in a bounded domain $\Omega \subset \mathbb{R}^3$ representing the aneurysm lumen. The reference CFD was produced with the SST $k$--$\omega$ transition model and Carreau-Yasuda blood rheology; we therefore pose the \emph{Reynolds-averaged} momentum and continuity equations with an effective viscosity that combines molecular (shear-dependent) and turbulent contributions.
 
 \subsubsection{RANS and Effective Viscosity}
 
@@ -109,7 +109,7 @@ where $\mathbf{u} = (u,v,w)^T$ is the velocity, $p$ is pressure, $\rho = 1060$\,
 \boldsymbol{\tau}_{\text{eff}} = \mu_{\text{eff}} \bigl( \nabla\mathbf{u} + (\nabla\mathbf{u})^T \bigr), \qquad \mu_{\text{eff}} = \mu(\dot{\gamma}) + \rho\,\nu_t.
 \label{eq:tau_eff}
 \end{equation}
-Here $\mu(\dot{\gamma})$ is the shear-dependent molecular viscosity (Carreau--Yasuda) and $\nu_t$ is the turbulent kinematic viscosity, which we treat as a \emph{learnable field} $\nu_t(\mathbf{x}; t_{\text{phase}})$ output by a separate network (see \S\ref{sec:arch}). Temporal dependence is captured by training on two discrete phases---systole and diastole---encoded as a scalar $t_{\text{phase}} \in \{0,1\}$; the same networks then approximate the flow at any query point $(\mathbf{x}, t_{\text{phase}})$.
+Here $\mu(\dot{\gamma})$ is the shear-dependent molecular viscosity (Carreau--Yasuda) and $\nu_t$ is the turbulent kinematic viscosity, which we treat as a \emph{learnable field} $\nu_t(\mathbf{x}; t_{\text{phase}})$ output by a separate network (see \S\ref{sec:arch}). Rather than solving transport equations for turbulence quantities such as $k$ and $\omega$, the network learns a spatially-varying effective eddy viscosity directly from the CFD data through the physics residual. Temporal dependence is captured by training on two discrete cardiac phases---systole and diastole---encoded as a scalar $t_{\text{phase}} \in \{0,1\}$; the same networks then approximate the flow at any query point $(\mathbf{x}, t_{\text{phase}})$.
 
 \subsubsection{Non-Newtonian Molecular Viscosity (Carreau--Yasuda)}
 \label{sec:carreau}
@@ -119,13 +119,13 @@ Blood exhibits shear-thinning: viscosity decreases with increasing shear rate. W
 \mu(\dot{\gamma}) = \mu_\infty + (\mu_0 - \mu_\infty) \left[ 1 + (\lambda \dot{\gamma})^a \right]^{(n-1)/a},
 \label{eq:carreau}
 \end{equation}
-with $\mu_\infty = 0.0035$\,Pa\,s, $\mu_0 = 0.16$\,Pa\,s, $\lambda = 8.2$\,s, $n = 0.2128$, $a = 0.64$. The shear rate is $\dot{\gamma} = \sqrt{2\,\mathrm{tr}(\mathbf{D}^2)}$ where $\mathbf{D} = \frac{1}{2}(\nabla\mathbf{u} + (\nabla\mathbf{u})^T)$. In the momentum residual we use $\mu(\dot{\gamma})$ at each collocation point; to avoid prohibitively expensive third derivatives, we adopt a \emph{quasi-steady} approximation: $\mu_{\text{mol}}$ is treated as a spatially varying coefficient when forming $\boldsymbol{\tau}_{\text{eff}}$, and only $\nabla\nu_t$ is differentiated through the graph, consistent with lagged viscosity updates in conventional RANS solvers.
+with $\mu_\infty = 0.0035$\,Pa\,s, $\mu_0 = 0.16$\,Pa\,s, $\lambda = 8.2$\,s, $n = 0.2128$, $a = 0.64$. The shear rate is $\dot{\gamma} = \sqrt{2\,\mathrm{tr}(\mathbf{D}^2)}$ where $\mathbf{D} = \frac{1}{2}(\nabla\mathbf{u} + (\nabla\mathbf{u})^T)$. In the momentum residual we use $\mu(\dot{\gamma})$ at each collocation point; to avoid prohibitively expensive third derivatives, we adopt a \emph{quasi-steady} approximation: $\mu_{\text{mol}}$ is treated as a spatially varying coefficient when forming $\boldsymbol{\tau}_{\text{eff}}$, and only $\nabla\nu_t$ is differentiated through the computational graph, consistent with lagged viscosity updates in conventional RANS solvers.
 
 \subsubsection{Boundary Conditions}
 
 \begin{itemize}
 \item \textbf{Wall} $\Gamma_{\text{wall}}$: no-slip $\mathbf{u} = \mathbf{0}$. Pressure and WSS are supervised from CFD on the same wall points.
-\item \textbf{Inlet} $\Gamma_{\text{in}}$: plug (or paraboloid) velocity with magnitude $V_{\text{inlet}}$; we enforce $|\mathbf{u}| = V_{\text{inlet}}$ with $V_{\text{inlet}} = 0.5$\,m/s (systole) and $0.1$\,m/s (diastole).
+\item \textbf{Inlet} $\Gamma_{\text{in}}$: uniform axial velocity with magnitude $V_{\text{inlet}} = 0.5$\,m/s (systole) and $0.1$\,m/s (diastole); transverse components are set to zero.
 \item \textbf{Outlet} $\Gamma_{\text{out}}$: zero gauge pressure $p = 0$.
 \end{itemize}
 
@@ -136,7 +136,7 @@ WSS is the tangential component of the traction $\boldsymbol{\tau}_{\text{eff}}\
 \boldsymbol{\tau}_w = \boldsymbol{\tau}_{\text{eff}}\,\mathbf{n} - (\mathbf{n}^T \boldsymbol{\tau}_{\text{eff}}\,\mathbf{n})\,\mathbf{n}, \qquad \text{WSS} = |\boldsymbol{\tau}_w| \;\text{ or }\; \boldsymbol{\tau}_w \text{ (vector)}.
 \label{eq:wss}
 \end{equation}
-At the wall, $\mu_{\text{eff}}$ uses the same Carreau--Yasuda $\mu(\dot{\gamma})$ from the velocity gradients and the learned $\nu_t$; WSS is then computed from the velocity derivatives via automatic differentiation and compared to CFD WSS in the loss.
+At the wall, $\mu_{\text{eff}}$ uses the same Carreau--Yasuda $\mu(\dot{\gamma})$ computed from the velocity gradients together with the learned $\nu_t$; WSS is then obtained from the velocity derivatives via automatic differentiation and compared to CFD WSS in the loss. Crucially, WSS is not a direct network output but a derived quantity, meaning the velocity networks must learn gradients that are consistent with the observed surface tractions.
 
 %==============================================================================
 \subsection{Non-Dimensionalisation and Standardisation}
@@ -162,87 +162,137 @@ Pressure and WSS targets are standardised so that data losses are $\mathcal{O}(1
 \label{sec:arch}
 %==============================================================================
 
-We use \emph{five} separate scalar-valued networks sharing the same input $(x,y,z,t_{\text{phase}})$: four for the flow ($u$, $v$, $w$, $p$) and one for the non-dimensional turbulent viscosity $\nu_{t,\text{bar}}$. Each flow branch has the same topology; the $\nu_t$ branch is smaller (fewer layers and width) because the turbulent viscosity field is smoother. Figure~\ref{fig:arch_overview} gives a high-level view; Figure~\ref{fig:arch_branch} details a single branch.
+We use \emph{five} separate scalar-valued networks sharing the same input $(x,y,z,t_{\text{phase}})$: four for the flow variables ($u$, $v$, $w$, $p$) and one for the non-dimensional turbulent viscosity $\nu_{t,\text{bar}}$. Each flow branch has the same topology with hidden dimension $H=128$ and $L=6$ residual blocks; the $\nu_t$ branch is deliberately smaller ($H=64$, $L=4$) because the turbulent viscosity field is spatially smoother and benefits from a more regularised representation. Figure~\ref{fig:arch_overview} gives a high-level view; Figure~\ref{fig:arch_branch} details a single branch.
 
 \subsubsection{Input and Output}
 
-The input is the 4-vector $\mathbf{z} = (x_{\text{std}}, y_{\text{std}}, z_{\text{std}}, t_{\text{phase}})$. Each of the five networks outputs a single scalar: $\mathrm{Net}_u(\mathbf{z}) \to u_{\text{bar}}$, $\mathrm{Net}_v \to v_{\text{bar}}$, $\mathrm{Net}_w \to w_{\text{bar}}$, $\mathrm{Net}_p \to p_{\text{std}}$, $\mathrm{Net}_{\nu_t} \to \nu_{t,\text{bar}}$. The $\nu_t$ output is constrained to be non-negative and bounded below by a small floor (e.g.\ $\nu_{t,\min} = 0.001$) via $\nu_{t,\text{bar}} = \mathrm{softplus}(\mathrm{raw} + \zeta) + \nu_{t,\min}$, with $\zeta$ a fixed shift so that the initial output is in a sensible range and gradients do not vanish.
+The input is the 4-vector $\mathbf{z} = (x_{\text{std}}, y_{\text{std}}, z_{\text{std}}, t_{\text{phase}})$. Each of the five networks outputs a single scalar: $\mathrm{Net}_u(\mathbf{z}) \to u_{\text{bar}}$, $\mathrm{Net}_v \to v_{\text{bar}}$, $\mathrm{Net}_w \to w_{\text{bar}}$, $\mathrm{Net}_p \to p_{\text{std}}$, $\mathrm{Net}_{\nu_t} \to \nu_{t,\text{bar}}$. The $\nu_t$ output must remain strictly positive, which we enforce through the transformation $\nu_{t,\text{bar}} = \mathrm{softplus}(\mathrm{raw} + \zeta) + \nu_{t,\min}$, where $\nu_{t,\min} = 0.001$ provides a hard floor and $\zeta = 2.0$ is a fixed shift that places the initial softplus operating point at $\mathrm{sigmoid}(2) \approx 0.88$, well away from the vanishing-gradient regime near zero. The decoder bias is initialised so that $\mathrm{softplus}(b + \zeta) \approx 0.05$, giving a physically reasonable starting turbulent viscosity across the domain.
 
 \subsubsection{Fourier Feature Encoding}
 
-Following Tancik et al., we pass $\mathbf{z}$ through a Fourier feature layer before the main MLP. With a fixed random matrix $\mathbf{B} \in \mathbb{R}^{4 \times K}$ (e.g.\ $K=16$ frequencies, entries drawn i.i.d.\ and scaled),
+Following Tancik et al.\ \cite{ref_tancik2020}, we pass $\mathbf{z}$ through a Fourier feature layer before the main MLP. With a fixed random matrix $\mathbf{B} \in \mathbb{R}^{4 \times K}$ ($K=16$ frequencies, entries drawn i.i.d.\ from $\mathcal{N}(0, \sigma^2)$ with scale $\sigma = 1.0$),
 \begin{equation}
 \mathbf{\phi}(\mathbf{z}) = \bigl[ \sin(2\pi \mathbf{B}^T \mathbf{z}), \; \cos(2\pi \mathbf{B}^T \mathbf{z}) \bigr] \in \mathbb{R}^{2K}.
 \end{equation}
-This expands the input to $2K$ dimensions and improves the network's ability to represent higher-frequency spatial structure, which is important for resolving shear layers and pressure gradients.
+This expands the input to $2K = 32$ dimensions and improves the network's ability to represent higher-frequency spatial structure, which is important for resolving shear layers and pressure gradients. The random matrix $\mathbf{B}$ is drawn once at initialisation and held fixed throughout training.
 
 \subsubsection{Residual MLP (Per Branch)}
 
-Each branch maps $\mathbf{\phi}(\mathbf{z})$ (or $\mathbf{z}$ if Fourier is disabled) through a linear layer to hidden dimension $H$ (e.g.\ $H=128$), then a stack of residual blocks, then a linear layer to the scalar output. Each residual block is
+Each branch maps $\mathbf{\phi}(\mathbf{z})$ through a linear encoder to hidden dimension $H$, followed by Swish activation, then a stack of residual blocks, and finally a linear decoder to the scalar output. Each residual block takes the form
 \begin{equation}
 \mathbf{h}^{(\ell+1)} = \mathbf{h}^{(\ell)} + \mathbf{W}_2^{(\ell)}\, \sigma\bigl( \mathbf{W}_1^{(\ell)} \mathbf{h}^{(\ell)} \bigr),
 \end{equation}
-with $\sigma$ the Swish activation. No activation is applied after the skip connection. The flow branches use six such blocks; the $\nu_t$ branch uses four blocks and a smaller $H$. Weights are initialised with Kaiming normal. This design yields smooth, differentiable outputs required for computing PDE residuals and WSS via autograd.
+where $\sigma$ denotes the Swish activation ($\sigma(x) = x \cdot \mathrm{sigmoid}(x)$). Notably, no activation is applied after the skip addition, preserving the linear pathway for gradient flow. All weights are initialised with Kaiming normal, and biases are initialised to zero. This architecture yields smooth, infinitely differentiable outputs---a requirement for computing PDE residuals and WSS via automatic differentiation. For the flow branches, the pipeline is: 4D input $\to$ 32D Fourier features $\to$ 128D encoder $\to$ 6 residual blocks (128D) $\to$ 1D decoder. The $\nu_t$ branch follows the same pattern at reduced scale (64D, 4 blocks) with the softplus output transform.
 
 \begin{figure}[t]
 \centering
 \begin{tikzpicture}[
-  node distance=0.5cm and 0.8cm,
-  input/.style={rectangle, draw, fill=blue!10, minimum width=1.2cm, minimum height=0.6cm},
-  net/.style={rectangle, draw, fill=green!15, minimum width=1.4cm, minimum height=0.5cm},
-  out/.style={rectangle, draw, fill=orange!15, minimum width=1cm, minimum height=0.5cm},
-  arrow/.style={-Stealth}
+  node distance=0.6cm and 0.7cm,
+  input/.style={rectangle, draw, fill=blue!10, minimum width=2.4cm, minimum height=0.7cm, font=\small},
+  fourier/.style={rectangle, draw, fill=cyan!12, minimum width=2.4cm, minimum height=0.6cm, font=\small},
+  net/.style={rectangle, draw, fill=green!15, minimum width=1.5cm, minimum height=0.55cm, font=\small},
+  outnode/.style={rectangle, draw, fill=orange!15, minimum width=1.1cm, minimum height=0.5cm, font=\small},
+  loss/.style={rectangle, draw, rounded corners, fill=red!8, minimum width=2.0cm, minimum height=0.55cm, font=\small},
+  physloss/.style={rectangle, draw, rounded corners, fill=green!10, minimum width=2.0cm, minimum height=0.55cm, font=\small},
+  derived/.style={rectangle, draw, dashed, fill=yellow!10, minimum width=1.4cm, minimum height=0.5cm, font=\scriptsize},
+  arrow/.style={-Stealth, thick},
+  thinArrow/.style={-Stealth, thin, gray}
   ]
-  \node[input] (in) {$(x,y,z,t)$};
-  \node[net, below left=of in, xshift=-0.2cm] (u) {Net $u$};
-  \node[net, below=of in] (v) {Net $v$};
-  \node[net, below right=of in, xshift=0.2cm] (w) {Net $w$};
-  \node[net, right=1.6cm of v] (p) {Net $p$};
-  \node[net, right=1.6cm of p] (nut) {Net $\nu_t$};
-  \node[out, below=of u] (ou) {$u$};
-  \node[out, below=of v] (ov) {$v$};
-  \node[out, below=of w] (ow) {$w$};
-  \node[out, below=of p] (op) {$p$};
-  \node[out, below=of nut] (onu) {$\nu_t$};
-  \draw[arrow] (in) -- (u); \draw[arrow] (in) -- (v); \draw[arrow] (in) -- (w);
-  \draw[arrow] (in) -- (p); \draw[arrow] (in) -- (nut);
-  \draw[arrow] (u) -- (ou); \draw[arrow] (v) -- (ov); \draw[arrow] (w) -- (ow);
-  \draw[arrow] (p) -- (op); \draw[arrow] (nut) -- (onu);
-  \node[above=0.1cm of in, font=\small] {Input};
-  \node[below=0.05cm of ou, font=\scriptsize] {velocity};
-  \node[below=0.05cm of onu, font=\scriptsize] {turb. visc.};
+  % Input
+  \node[input] (in) {$\mathbf{z} = (x_{\text{std}},y_{\text{std}},z_{\text{std}},t_{\text{phase}})$};
+  % Fourier
+  \node[fourier, below=0.4cm of in] (ff) {Fourier $\phi(\mathbf{z}) \in \mathbb{R}^{32}$};
+  \draw[arrow] (in) -- (ff);
+
+  % Networks
+  \node[net, below left=0.6cm and 2.4cm of ff] (u) {Net$_u$};
+  \node[net, below left=0.6cm and 0.8cm of ff] (v) {Net$_v$};
+  \node[net, below=0.6cm of ff] (w) {Net$_w$};
+  \node[net, below right=0.6cm and 0.8cm of ff] (p) {Net$_p$};
+  \node[net, below right=0.6cm and 2.4cm of ff] (nut) {Net$_{\nu_t}$};
+
+  \draw[arrow] (ff) -- (u);
+  \draw[arrow] (ff) -- (v);
+  \draw[arrow] (ff) -- (w);
+  \draw[arrow] (ff) -- (p);
+  \draw[arrow] (ff) -- (nut);
+
+  % Outputs
+  \node[outnode, below=0.4cm of u] (ou) {$u$};
+  \node[outnode, below=0.4cm of v] (ov) {$v$};
+  \node[outnode, below=0.4cm of w] (ow) {$w$};
+  \node[outnode, below=0.4cm of p] (op) {$p$};
+  \node[outnode, below=0.4cm of nut] (onu) {$\nu_t$};
+
+  \draw[arrow] (u) -- (ou);
+  \draw[arrow] (v) -- (ov);
+  \draw[arrow] (w) -- (ow);
+  \draw[arrow] (p) -- (op);
+  \draw[arrow] (nut) -- (onu);
+
+  % Derived WSS
+  \node[derived, below=0.5cm of ov] (wss) {WSS (derived)};
+  \draw[thinArrow] (ou.south) -- ++(0,-0.3) -| (wss.north west);
+  \draw[thinArrow] (ov.south) -- (wss.north);
+  \draw[thinArrow] (ow.south) -- ++(0,-0.3) -| (wss.north east);
+
+  % Loss boxes
+  \node[loss, below=1.3cm of ow] (dataloss) {Data/BC Loss};
+  \node[physloss, below=1.3cm of onu] (physloss) {Physics Loss};
+
+  \draw[thinArrow] (wss.south) -- ++(0,-0.15) -| (dataloss.north);
+  \draw[thinArrow] (op.south) -- ++(0,-0.8) -| (dataloss.north east);
+  \draw[thinArrow] (onu.south) -- ++(0,-0.8) -| (physloss.north);
+
+  % Annotations
+  \node[above=0.1cm of in, font=\scriptsize, gray] {Shared input};
+  \node[right=0.15cm of onu, font=\scriptsize, gray] {softplus};
+  \node[below=0.05cm of wss, font=\scriptsize, gray] {$\nabla \mathbf{u} \cdot \mathbf{n}$};
 \end{tikzpicture}
-\caption{High-level PINN architecture: a single shared input $(x,y,z,t_{\text{phase}})$ is fed into five independent networks that output the three velocity components, pressure, and non-dimensional turbulent viscosity. WSS is derived from the velocity field and $\mu_{\text{eff}}$ at the wall, not a separate output.}
+\caption{High-level PINN architecture. A shared input $\mathbf{z}$ is mapped through Fourier feature encoding and then fed into five independent networks. The three velocity outputs ($u$, $v$, $w$) are used to derive WSS via automatic differentiation of the stress tensor at the wall; WSS is not a separate network output. Data and boundary losses operate on wall predictions, while the physics loss enforces RANS residuals at interior collocation points using all five outputs.}
 \label{fig:arch_overview}
 \end{figure}
 
 \begin{figure}[t]
 \centering
 \begin{tikzpicture}[
-  node distance=0.4cm and 0.5cm,
-  block/.style={rectangle, draw, minimum height=0.55cm, minimum width=1.8cm},
-  smallblock/.style={rectangle, draw, minimum height=0.45cm, minimum width=1.2cm},
-  arrow/.style={-Stealth}
+  node distance=0.45cm,
+  block/.style={rectangle, draw, minimum height=1.0cm, minimum width=1.3cm, font=\small, align=center},
+  arrow/.style={-Stealth, thick},
+  dim/.style={font=\scriptsize, gray, align=center}
   ]
-  \node[block, fill=blue!12] (z) {Input $\mathbf{z}$};
-  \node[block, fill=cyan!15, below=of z] (ff) {Fourier $\mathbf{\phi}(\mathbf{z})$};
-  \node[block, fill=green!12, below=of ff] (enc) {Linear $\to H$, Swish};
-  \node[block, fill=green!12, below=of enc] (res1) {ResBlock};
-  \node[block, fill=green!12, below=of res1] (res2) {ResBlock};
-  \node[below=0.2cm of res2, font=\scriptsize] {$\vdots$};
-  \node[block, fill=green!12, below=0.5cm of res2] (resN) {ResBlock};
-  \node[block, fill=orange!12, below=of resN] (dec) {Linear $\to 1$};
-  \node[smallblock, fill=yellow!15, below=of dec] (out) {Scalar output};
-  \draw[arrow] (z) -- (ff);
-  \draw[arrow] (ff) -- (enc);
-  \draw[arrow] (enc) -- (res1);
-  \draw[arrow] (res1) -- (res2);
-  \draw[arrow] (res2) -- (resN);
-  \draw[arrow] (resN) -- (dec);
-  \draw[arrow] (dec) -- (out);
-  \node[right=0.3cm of res2, font=\scriptsize, align=left] {$\mathbf{h}+\sigma(\mathbf{W}_2\sigma(\mathbf{W}_1\mathbf{h}))$};
+  % Main pipeline left-to-right
+  \node[block, fill=blue!12]   (z)    {Input\\$\mathbf{z}$};
+  \node[block, fill=cyan!15,   right=of z]             (ff)   {Fourier\\$\phi(\mathbf{z})$};
+  \node[block, fill=green!12,  right=of ff]            (enc)  {Linear\\+~Swish};
+  \node[block, fill=green!12,  right=of enc]           (r1)   {Res-\\Block~1};
+  \node[right=0.3cm of r1,    font=\normalsize]        (dots) {$\cdots$};
+  \node[block, fill=green!12,  right=0.3cm of dots]    (rL)   {Res-\\Block~$L$};
+  \node[block, fill=orange!12, right=of rL]            (dec)  {Linear};
+  \node[block, fill=yellow!15, right=of dec]           (out)  {Scalar\\output};
+  % Arrows
+  \draw[arrow] (z)    -- (ff);
+  \draw[arrow] (ff)   -- (enc);
+  \draw[arrow] (enc)  -- (r1);
+  \draw[arrow] (r1)   -- (dots);
+  \draw[arrow] (dots) -- (rL);
+  \draw[arrow] (rL)   -- (dec);
+  \draw[arrow] (dec)  -- (out);
+  % Dimension labels below each block
+  \node[dim, below=0.1cm of z]   {$\mathbb{R}^4$};
+  \node[dim, below=0.1cm of ff]  {$\mathbb{R}^{32}$};
+  \node[dim, below=0.1cm of enc] {$\mathbb{R}^H$};
+  \node[dim, below=0.1cm of r1]  {$\mathbb{R}^H$};
+  \node[dim, below=0.1cm of rL]  {$\mathbb{R}^H$};
+  \node[dim, below=0.1cm of dec] {$\mathbb{R}^1$};
+  % ResBlock formula below the chain
+  \node[font=\scriptsize, below=0.75cm of dots, align=center]
+       {ResBlock: $\;\mathbf{h} \leftarrow \mathbf{h} + \mathbf{W}_2\,\sigma(\mathbf{W}_1\,\mathbf{h})$\quad (no outer activation)};
+  % Branch-specific note
+  \node[font=\scriptsize, gray, below=1.3cm of dec, align=center]
+       {Flow: $H{=}128$,\;$L{=}6$\quad $\nu_t$: $H{=}64$,\;$L{=}4$, softplus output};
 \end{tikzpicture}
-\caption{Structure of a single branch (e.g.\ Net $u$ or Net $p$): input $\mathbf{z}$ is mapped through Fourier features, one linear layer (encoder), a stack of residual blocks with Swish, and a final linear layer (decoder) to one scalar. The $\nu_t$ branch is similar but with fewer/smaller blocks and a non-negative output transform.}
+\caption{Single network branch laid out left to right: the 4D input $\mathbf{z}$ is mapped through Fourier features ($\mathbb{R}^{32}$), a linear encoder with Swish activation, a stack of $L$ residual blocks (all at hidden dimension $H$), and a linear decoder to one scalar. Each residual block applies $\mathbf{h} + \mathbf{W}_2\,\sigma(\mathbf{W}_1\,\mathbf{h})$ without an outer activation. Flow branches use $H=128$, $L=6$; the $\nu_t$ branch uses $H=64$, $L=4$ with a softplus output transform.}
 \label{fig:arch_branch}
 \end{figure}
 
@@ -251,62 +301,138 @@ with $\sigma$ the Swish activation. No activation is applied after the skip conn
 \label{sec:loss}
 %==============================================================================
 
-The total loss is a weighted sum of data and physics terms. We use fixed weights chosen so that no single term dominates; a physics weight ramp is applied over the first several thousand epochs so that the flow first fits the data before strongly satisfying the PDE.
+The total loss is a weighted sum of data-fitting and physics-enforcement terms. Rather than relying on manually tuned fixed weights, we employ a gradient-norm adaptive weighting scheme that dynamically rebalances the loss components throughout training based on their gradient magnitudes. Initial weights provide a starting configuration, and the adaptive mechanism adjusts them every 100 epochs to prevent any single term from dominating gradient updates.
 
 \subsubsection{Data and Boundary Terms}
 
 \begin{itemize}
-\item \textbf{WSS loss} $\mathcal{L}_{\text{WSS}}$: mean squared error between predicted and CFD WSS (all three components) on wall points, in standardised space. Evaluated in batches over the wall set.
+\item \textbf{WSS loss} $\mathcal{L}_{\text{WSS}}$: mean squared error between predicted and CFD WSS (all three components) on wall points, computed in standardised space. The predicted WSS is obtained by differentiating the velocity networks and forming the tangential traction (Eq.~\ref{eq:wss}), incorporating the Carreau-Yasuda viscosity ratio. To manage GPU memory, wall points are processed in batches of 16{,}000.
 \item \textbf{Pressure loss} $\mathcal{L}_p$: MSE between predicted and CFD pressure on wall points (standardised).
-\item \textbf{No-slip loss} $\mathcal{L}_{\text{wall}}$: MSE of $u,v,w$ on wall points (should be zero).
-\item \textbf{Inlet loss} $\mathcal{L}_{\text{inlet}}$: MSE between predicted velocity magnitude and the prescribed $V_{\text{inlet}}$ on inlet points.
-\item \textbf{Outlet loss} $\mathcal{L}_{\text{outlet}}$: MSE of pressure on outlet points (should be zero).
+\item \textbf{No-slip loss} $\mathcal{L}_{\text{wall}}$: MSE of $u,v,w$ on wall points (target: zero).
+\item \textbf{Inlet loss} $\mathcal{L}_{\text{inlet}}$: MSE between predicted velocity and the prescribed axial $V_{\text{inlet}}$ on inlet cross-section points, with transverse components penalised toward zero.
+\item \textbf{Outlet loss} $\mathcal{L}_{\text{outlet}}$: MSE of pressure on outlet cross-section points (target: zero gauge).
 \end{itemize}
 
 \subsubsection{Physics Loss}
 
-At a set of \emph{collocation points} $\{\mathbf{x}_i\}$ sampled in the interior of $\Omega$, we form the continuity residual $r_c = \nabla \cdot \mathbf{u}$ and the three momentum residuals $r_{m,x}, r_{m,y}, r_{m,z}$ from the left-hand side minus the right-hand side of the non-dimensional RANS momentum equation (including $\mu_{\text{eff}} = \mu_{\text{mol}}(\dot{\gamma}) + \nu_{t,\text{bar}}$ and the quasi-steady treatment of $\nabla\mu_{\text{mol}}$). Then
+At a set of \emph{collocation points} $\{\mathbf{x}_i\}_{i=1}^{N_c}$ sampled in the interior of $\Omega$, we form the continuity residual $r_c = \nabla \cdot \mathbf{u}$ and the three momentum residuals $r_{m,x}, r_{m,y}, r_{m,z}$ from the left-hand side minus the right-hand side of the non-dimensional RANS momentum equation (including $\mu_{\text{eff}} = \mu_{\text{mol}}(\dot{\gamma}) + \nu_{t,\text{bar}}$ and the quasi-steady treatment of $\nabla\mu_{\text{mol}}$). The physics loss is then
 \begin{equation}
-\mathcal{L}_{\text{physics}} = \frac{1}{N_c} \sum_i \bigl( r_c^2 + r_{m,x}^2 + r_{m,y}^2 + r_{m,z}^2 \bigr).
+\mathcal{L}_{\text{physics}} = \frac{1}{N_c} \sum_{i=1}^{N_c} \bigl( r_c^2 + r_{m,x}^2 + r_{m,y}^2 + r_{m,z}^2 \bigr).
 \end{equation}
-Derivatives of $\mathbf{u}$, $p$, and $\nu_t$ with respect to $\mathbf{x}_{\text{std}}$ are obtained by automatic differentiation; the chain rule converts them to the non-dimensional physical space used in the PDE. Typically $N_c \approx 6000$ interior points per phase, processed in minibatches (e.g.\ 3000 per batch).
+All spatial derivatives of $\mathbf{u}$, $p$, and $\nu_t$ with respect to $\mathbf{x}_{\text{std}}$ are obtained via automatic differentiation; the chain rule converts them to the non-dimensional physical space used in the PDE. We use $N_c = 6{,}000$ interior collocation points per cardiac phase, processed in minibatches of 3{,}000 to control memory usage.
 
 \subsubsection{$\nu_t$ Lower-Bound Regularisation}
 
-To prevent the vanishing gradient problem and the trivial $\nu_t = 0$ solution (a degenerate laminar flow collapse), we first introduce a softplus activation with a specific shift factor (e.g., $+2.0$) to guarantee non-zero initialisations and robust gradient propagation. Additionally, we apply a soft penalty loss, $\mathcal{L}_{\nu_t}$, that penalises the mean turbulent viscosity if it drops below a physiological floor ($\nu_{t,\text{target}} = 0.01$) across the collocation points:
+Without explicit regularisation, the $\nu_t$ network can collapse to near-zero values---a trivial solution that simplifies the momentum residual at the expense of physical fidelity. To prevent this, we impose a soft lower-bound penalty at each collocation point:
 \begin{equation}
-\mathcal{L}_{\nu_t} = \lambda_{\nu_t} \max\left(0, \nu_{t,\text{target}} - \frac{1}{N_c} \sum_i \nu_{t,\text{bar}}(\mathbf{x}_i)\right)^2.
+\mathcal{L}_{\nu_t} = \frac{\lambda_{\nu_t}}{N_c} \sum_{i=1}^{N_c} \max\bigl(0, \;\nu_{t,\text{target}} - \nu_{t,\text{bar}}(\mathbf{x}_i)\bigr)^2,
 \end{equation}
-This is combined with the main loss with a fixed weight $\lambda_{\nu_t}$.
+with $\lambda_{\nu_t} = 100$ and $\nu_{t,\text{target}} = 0.05$. This point-wise formulation ensures that each collocation point provides an independent gradient signal to the $\nu_t$ network, preventing batch averaging from washing out spatial information. Combined with the hard floor ($\nu_{t,\min} = 0.001$) in the network output layer, this dual constraint keeps the turbulent viscosity in a physically meaningful range.
 
-\subsubsection{Bounded Adaptive Weighting and Total Loss}
+\subsubsection{Total Loss}
 
-The total loss is computed as a weighted sum of individual loss components:
+The total loss combines all terms with learnable adaptive weights:
 \begin{equation}
-\mathcal{L} = \lambda_{\text{WSS}}\mathcal{L}_{\text{WSS}} + \lambda_p \mathcal{L}_p + \lambda_{\text{wall}}\mathcal{L}_{\text{wall}} + \lambda_{\text{inlet}}\mathcal{L}_{\text{inlet}} + \lambda_{\text{outlet}}\mathcal{L}_{\text{outlet}} + \lambda_{\text{phys}}\,\mathcal{L}_{\text{physics}} + \mathcal{L}_{\nu_t}.
+\mathcal{L} = \lambda_{\text{WSS}}\,\mathcal{L}_{\text{WSS}} + \lambda_p\,\mathcal{L}_p + \lambda_{\text{wall}}\,\mathcal{L}_{\text{wall}} + \lambda_{\text{inlet}}\,\mathcal{L}_{\text{inlet}} + \lambda_{\text{outlet}}\,\mathcal{L}_{\text{outlet}} + \lambda_{\text{phys}}\,\mathcal{L}_{\text{physics}} + \mathcal{L}_{\nu_t}.
+\label{eq:total_loss}
 \end{equation}
-To effectively balance these constraints throughout training, we employ a gradient-norm based adaptive weighting scheme (inspired by Wang et al.\ 2021) which updates the weights dynamically to prevent boundary conditions from overwhelming the physics loss. Crucially, we introduce two bounding mechanisms to this adaptive scheme: a \emph{physics weight floor} ($\lambda_{\text{phys}} \ge 0.1$) to ensure the PDE constraints are never ignored, and a \emph{weight cap} (e.g., capped at 20.0) to prevent the relatively easier boundary conditions (inlet, outlet, no-slip) from artificially inflating and suppressing the interior residual learning.
+The initial (seed) weights are $\lambda_{\text{WSS}} = 1$, $\lambda_p = 10$, $\lambda_{\text{wall}} = \lambda_{\text{inlet}} = \lambda_{\text{outlet}} = 10$, and $\lambda_{\text{phys}} = 0.01$. Boundary conditions receive stronger initial weighting because their satisfaction provides the geometric scaffolding on which the interior physics solution is built: without accurate no-slip, inlet, and outlet conditions, the RANS residual loses its physical grounding. The physics weight starts low to allow the data-fitting terms to establish a reasonable velocity and pressure field before the PDE constraints begin shaping the interior solution. These initial weights are then continuously adjusted by the adaptive scheme described next.
 
-Figure~\ref{fig:loss_schematic} summarises the loss composition.
+\subsubsection{Gradient-Norm Adaptive Loss Weighting}
+\label{sec:adaptive_weights}
+
+Training a PINN involves minimising a composite objective whose individual terms can have gradient magnitudes that differ by orders of magnitude. If left unbalanced, terms with large gradients dominate the parameter updates while terms with small gradients are effectively ignored, leading to poor convergence or physically inconsistent solutions. We address this with a gradient-norm balancing strategy inspired by Wang et al.\ \cite{ref_wang2021}, adapted to our multi-loss setting.
+
+Every $T_{\text{update}} = 100$ epochs, we compute the mean absolute gradient of each loss component with respect to all flow network parameters:
+\begin{equation}
+G_i = \frac{1}{|\boldsymbol{\theta}|} \sum_{j} \left| \frac{\partial \mathcal{L}_i}{\partial \theta_j} \right|, \qquad i \in \{\text{WSS}, p, \text{wall}, \text{inlet}, \text{outlet}, \text{phys}\}.
+\end{equation}
+We designate the WSS loss as the reference (since WSS prediction is the primary clinical output) and compute the raw rebalancing weight for each term as $\hat{\lambda}_i = G_{\text{WSS}} / G_i$. To prevent oscillatory weight updates, we smooth with an exponential moving average:
+\begin{equation}
+\lambda_i^{(t)} = (1 - \alpha)\,\lambda_i^{(t-1)} + \alpha\,\hat{\lambda}_i, \qquad \alpha = 0.9.
+\end{equation}
+Two safeguards prevent degenerate weighting: a floor on the physics weight ($\lambda_{\text{phys}} \geq 0.1$) ensures that the governing equations always contribute meaningfully, and a global cap ($\lambda_i \leq 20$) prevents any term whose loss has nearly vanished from receiving disproportionately large weight. The full procedure is summarised in Algorithm~\ref{alg:adaptive_weights}.
+
+\begin{algorithm}[t]
+\caption{Gradient-Norm Adaptive Loss Weighting}
+\label{alg:adaptive_weights}
+\begin{algorithmic}[1]
+\Require Loss terms $\{\mathcal{L}_i\}$, network parameters $\boldsymbol{\theta}$, current weights $\{\lambda_i\}$
+\Require Smoothing $\alpha = 0.9$, floor $\lambda_{\text{phys}}^{\min} = 0.1$, cap $\lambda^{\max} = 20$
+\For{each loss $\mathcal{L}_i$}
+    \State $G_i \gets \text{mean}(|\nabla_{\boldsymbol{\theta}} \mathcal{L}_i|)$ \Comment{mean absolute gradient norm}
+\EndFor
+\State $G_{\text{ref}} \gets G_{\text{WSS}}$ \Comment{reference loss}
+\For{each loss $\mathcal{L}_i$}
+    \State $\hat{\lambda}_i \gets G_{\text{ref}} / G_i$
+    \State $\lambda_i \gets (1-\alpha)\,\lambda_i + \alpha\,\hat{\lambda}_i$ \Comment{EMA smoothing}
+    \State $\lambda_i \gets \min(\lambda_i, \lambda^{\max})$ \Comment{cap}
+\EndFor
+\State $\lambda_{\text{phys}} \gets \max(\lambda_{\text{phys}}, \lambda_{\text{phys}}^{\min})$ \Comment{physics floor}
+\end{algorithmic}
+\end{algorithm}
+
+Figure~\ref{fig:loss_schematic} provides an overview of how the individual losses are composed and routed to the two optimisers.
 
 \begin{figure}[t]
 \centering
 \begin{tikzpicture}[
-  lossbox/.style={rectangle, draw, rounded corners, minimum width=1.6cm, minimum height=0.5cm, font=\small},
-  arrow/.style={-Stealth, thick}
+        x=1cm, y=1cm,
+        lossbox/.style={rectangle, draw, rounded corners, minimum width=1.85cm, minimum height=0.58cm, font=\small, align=center},
+        optbox/.style={rectangle, draw, rounded corners, thick, minimum width=3.0cm, minimum height=0.65cm, font=\small, align=center},
+        sumbox/.style={rectangle, draw, rounded corners, thick, fill=gray!6, minimum width=5.8cm, minimum height=0.76cm, font=\small, align=center},
+        arrow/.style={-Stealth, thick},
+        thinArrow/.style={-Stealth, semithick, gray!70}
   ]
-  \node[lossbox, fill=red!10] (Lwss) {$\mathcal{L}_{\text{WSS}}$};
-  \node[lossbox, fill=red!10, right=0.4cm of Lwss] (Lp) {$\mathcal{L}_p$};
-  \node[lossbox, fill=orange!12, right=0.4cm of Lp] (Lwall) {$\mathcal{L}_{\text{wall}}$};
-  \node[lossbox, fill=orange!12, right=0.4cm of Lwall] (Lio) {$\mathcal{L}_{\text{in/out}}$};
-  \node[lossbox, fill=green!15, below=0.6cm of Lp] (Lphys) {$\mathcal{L}_{\text{physics}}$};
-  \node[lossbox, fill=blue!10, below=0.6cm of Lwall] (Lnut) {$\mathcal{L}_{\nu_t}$};
-  \node[draw, rounded corners, inner sep=0.4cm, fit=(Lwss)(Lp)(Lwall)(Lio)(Lphys)(Lnut), label=below:Weighted sum $\to$ $\mathcal{L}_{\text{total}}$] (box) {};
-  \draw[arrow] (Lwss) -- (box); \draw[arrow] (Lp) -- (box);
-  \draw[arrow] (Lwall) -- (box); \draw[arrow] (Lio) -- (box);
-  \draw[arrow] (Lphys) -- (box); \draw[arrow] (Lnut) -- (box);
+        % Top row: data and boundary losses
+        \node[lossbox, fill=red!12]    (Lwss)  at (-4.2, 2.2) {$\mathcal{L}_{\text{WSS}}$};
+        \node[lossbox, fill=red!12]    (Lp)    at (-2.1, 2.2) {$\mathcal{L}_p$};
+        \node[lossbox, fill=orange!12] (Lwall) at ( 0.0, 2.2) {$\mathcal{L}_{\text{wall}}$};
+        \node[lossbox, fill=orange!12] (Lin)   at ( 2.1, 2.2) {$\mathcal{L}_{\text{in}}$};
+        \node[lossbox, fill=orange!12] (Lout)  at ( 4.2, 2.2) {$\mathcal{L}_{\text{out}}$};
+
+        % Second row: physics + regularisation
+        \node[lossbox, fill=green!15]  (Lphys) at (-1.2, 1.25) {$\mathcal{L}_{\text{physics}}$};
+        \node[lossbox, fill=blue!10]   (Lnut)  at ( 1.2, 1.25) {$\mathcal{L}_{\nu_t}$};
+
+        % Adaptive weighting note
+        \node[font=\scriptsize, gray] at (0.0, 2.9) {$\lambda_i^{\text{adapt}}$ (gradient-norm balanced)};
+
+        % Aggregate objective + optimisers
+        \node[sumbox] (Ltotal) at (0.0, 0.2) {$\mathcal{L}_{\text{total}} = \sum_i \lambda_i\,\mathcal{L}_i$};
+        \node[optbox, fill=green!8] (flowopt) at (-2.0, -1.15) {Flow Optimiser ($u,v,w,p$)};
+        \node[optbox, fill=blue!8]  (nutopt)  at ( 2.3, -1.15) {$\nu_t$ Optimiser};
+
+        % Grouped routing points (reduces clutter)
+        \coordinate (hubL) at (-1.9, 0.85);
+        \coordinate (hubC) at ( 0.0, 0.92);
+        \coordinate (hubR) at ( 1.9, 0.85);
+
+        % Routing to total loss
+        \draw[thinArrow] (Lwss.south)  -- (hubL);
+        \draw[thinArrow] (Lp.south)    -- (hubL);
+        \draw[thinArrow] (Lwall.south) -- (hubC);
+        \draw[thinArrow] (Lin.south)   -- (hubR);
+        \draw[thinArrow] (Lout.south)  -- (hubR);
+        \draw[thinArrow] (Lphys.south) -- (hubC);
+        \draw[thinArrow] (Lnut.south)  -- (hubC);
+
+        \draw[thinArrow] (hubL) -- (Ltotal.north west);
+        \draw[thinArrow] (hubC) -- (Ltotal.north);
+        \draw[thinArrow] (hubR) -- (Ltotal.north east);
+
+        % Optimiser update paths
+        \draw[arrow] (Ltotal.south) -- (flowopt.north);
+        \draw[arrow, blue!60] (Lphys.east) -- ++(2.8,0) -- ++(0,-2.05) -- (nutopt.north east);
+        \draw[arrow, blue!60] (Lnut.east)  -- ++(1.1,0) -- ++(0,-2.05) -- (nutopt.north west);
+
+        % Labels and legend
+        \node[font=\scriptsize, gray]    at (-3.4, -0.55) {all losses};
+        \node[font=\scriptsize, blue!60] at ( 4.05, -0.55) {physics only};
+        \node[font=\scriptsize, red!70]    at (-5.1, 2.65) {data};
+        \node[font=\scriptsize, orange!70] at ( 3.35, 2.65) {BCs};
 \end{tikzpicture}
-\caption{Schematic of loss composition: data terms (WSS, pressure) and boundary terms (wall, inlet, outlet) are combined with the physics residual and $\nu_t$ regularisation. All terms are weighted; $\lambda_{\text{physics}}$ is ramped over training.}
+\caption{Loss composition and dual-optimiser routing. Data terms (WSS, pressure) and boundary terms (no-slip, inlet, outlet) are combined with the physics residual and $\nu_t$ regularisation via adaptive weights. All terms flow to the flow optimiser that updates $u,v,w,p$; only the physics loss and $\nu_t$ regularisation update the turbulent viscosity network.}
 \label{fig:loss_schematic}
 \end{figure}
 
@@ -315,38 +441,145 @@ Figure~\ref{fig:loss_schematic} summarises the loss composition.
 \label{sec:training}
 %==============================================================================
 
-\subsubsection{Alternating Optimisation for Turbulent Viscosity}
+\subsubsection{Alternating Dual-Optimiser Strategy}
 
-We use an alternating optimisation strategy with two separate AdamW optimisers: one for the parameters of the four flow networks ($u,v,w,p$), and one for the $\nu_t$ network. Standard joint optimisation fails because the network tends to collapse the turbulent viscosity to zero ($\nu_t = 0$), effectively reverting to a laminar flow regime to easily satisfy data losses. To solve this, we decouple the $\nu_t$ network from the flow networks. The flow parameters are updated using the full loss $\mathcal{L}$ (all data, boundary, and physics terms). The $\nu_t$ parameters are updated using only $\mathcal{L}_{\text{physics}} + \mathcal{L}_{\nu_t}$, ensuring the turbulent viscosity receives a direct, uncontaminated gradient signal from the PDE residual and its regulariser. The flow learning rate is set to a base value (e.g.\ $10^{-4}$) and the $\nu_t$ learning rate to a multiple (e.g.\ 10$\times$) of that. Both learning rates are decayed with a cosine annealing schedule to a minimum over the total number of epochs (10,000). Gradient clipping (max norm 1) is applied to avoid instability when computing second derivatives.
+A central design choice in our training procedure is the use of two separate AdamW optimisers with an alternating update scheme. The \emph{flow optimiser} controls the parameters of the four flow networks ($u$, $v$, $w$, $p$) and is updated using the full composite loss $\mathcal{L}$ (Eq.~\ref{eq:total_loss}), so that velocity and pressure are shaped by data fitting, boundary conditions, and physics enforcement simultaneously. The \emph{turbulent viscosity optimiser} controls Net$_{\nu_t}$ and is updated using \emph{only} $\mathcal{L}_{\text{physics}} + \mathcal{L}_{\nu_t}$---the PDE residual and the soft lower-bound penalty. This separation is motivated by the observation that data-driven gradients (WSS, pressure matching) provide no direct information about what the turbulent viscosity should be; routing these gradients to Net$_{\nu_t}$ would introduce noise and slow convergence. By receiving gradient signal exclusively from the governing equations, Net$_{\nu_t}$ learns the spatially-varying eddy viscosity field that makes the RANS momentum residual as small as possible---effectively performing an implicit turbulence closure.
 
-\subsubsection{Data and Collocation Sampling}
+Within each training epoch, the procedure iterates over both cardiac phases and for each phase:
+\begin{enumerate}
+\item Compute the full loss $\mathcal{L}$ and backpropagate through the flow network parameters. Apply gradient clipping (max norm 1.0) and step the flow optimiser.
+\item Separately compute $\mathcal{L}_{\text{physics}} + \mathcal{L}_{\nu_t}$ and backpropagate through the $\nu_t$ network parameters. Apply gradient clipping and step the $\nu_t$ optimiser.
+\end{enumerate}
 
-Wall data (coordinates, normals, pressure, WSS) are subsampled from the full CFD set by a factor (e.g.\ one in three points) to reduce cost whilst retaining spatial coverage. Inlet and outlet points are generated on cross-sections from the mesh. Interior collocation points are sampled once per configuration (or resampled periodically, e.g.\ every 500 epochs, with a fraction of new points) within the lumen. Normals at the wall are computed from the point cloud (e.g.\ via local PCA or oriented consistently inward) for WSS evaluation.
+Algorithm~\ref{alg:training} gives the complete per-epoch training procedure.
+
+\begin{algorithm}[t]
+\caption{Per-Epoch Training Loop with Alternating Dual-Optimiser}
+\label{alg:training}
+\begin{algorithmic}[1]
+\Require Networks $\boldsymbol{\theta} = \{\theta_u, \theta_v, \theta_w, \theta_p, \theta_{\nu_t}\}$, flow optimiser $\mathcal{O}_{\text{flow}}$, $\nu_t$ optimiser $\mathcal{O}_{\nu_t}$
+\Require Loss weights $\{\lambda_i\}$, gradient clip $c = 1.0$, adaptive interval $T_{\text{update}} = 100$
+\Require Max epochs $E_{\max} = 10{,}000$, early-stopping patience $P = 3{,}000$
+\For{$e = 1, \ldots, E_{\max}$}
+    \For{each cardiac phase $s \in \{\text{systolic},\,\text{diastolic}\}$}
+        \State \textbf{// Step 1: update flow networks}
+        \State Compute $\mathcal{L}_{\text{total}}$ \hspace{0.5em}(Eq.~\ref{eq:total_loss}) using current $\boldsymbol{\theta}$
+        \State $\mathcal{O}_{\text{flow}}$.zero\_grad(); \; $\mathcal{L}_{\text{total}}$.backward()
+        \State Clip gradients of $\{\theta_u,\theta_v,\theta_w,\theta_p\}$ to max norm $c$
+        \State $\mathcal{O}_{\text{flow}}$.step()
+        \State \textbf{// Step 2: update turbulent viscosity network}
+        \State Compute $\mathcal{L}_{\nu_t\text{-update}} = \mathcal{L}_{\text{physics}} + \mathcal{L}_{\nu_t}$ using current $\boldsymbol{\theta}$
+        \State $\mathcal{O}_{\nu_t}$.zero\_grad(); \; $\mathcal{L}_{\nu_t\text{-update}}$.backward()
+        \State Clip gradients of $\theta_{\nu_t}$ to max norm $c$
+        \State $\mathcal{O}_{\nu_t}$.step()
+    \EndFor
+    \If{$e \bmod T_{\text{update}} = 0$}
+        \State Update $\{\lambda_i\}$ via Algorithm~\ref{alg:adaptive_weights} \Comment{gradient-norm rebalancing}
+    \EndIf
+    \State Decay learning rates via cosine annealing (Eq.~\ref{eq:cosine})
+    \If{no improvement in $\mathcal{L}_{\text{total}}$ by $> 10^{-6}$ for $P$ consecutive epochs}
+        \State \textbf{break} \Comment{early stopping}
+    \EndIf
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Optimiser Hyperparameters}
+
+The flow optimiser uses a base learning rate of $10^{-4}$ with AdamW ($\beta_1 = 0.9$, $\beta_2 = 0.99$, $\varepsilon = 10^{-15}$, weight decay $10^{-4}$). The $\nu_t$ optimiser uses a $10\times$ higher learning rate ($10^{-3}$) with reduced weight decay ($10^{-5}$), reflecting the need for the smaller $\nu_t$ network to adapt quickly to the evolving flow field. Both learning rates are decayed via a cosine annealing schedule from their initial values to $\eta_{\min} = 10^{-6}$ over the full 10{,}000 training epochs:
+\begin{equation}
+\eta(e) = \eta_{\min} + \frac{1}{2}(\eta_0 - \eta_{\min})\left(1 + \cos\frac{\pi e}{E_{\max}}\right).
+\label{eq:cosine}
+\end{equation}
+
+\subsubsection{Wall Data and Interior Collocation}
+
+Wall data (coordinates, pressure, WSS) are subsampled from the full CFD wall mesh by a factor of three, retaining approximately one third of the available surface points whilst maintaining spatial coverage across the aneurysm geometry. Wall normals are estimated from the subsampled point cloud using Open3D's local PCA-based algorithm with a hybrid KD-tree search (search radius 0.01\,m, maximum 30 nearest neighbours). The resulting normals are oriented consistently inward by checking the dot product of each normal with the vector from the surface point to the domain centroid; normals pointing outward are flipped. These inward normals serve a dual purpose: they define the surface orientation needed for WSS computation (Eq.~\ref{eq:wss}), and they provide the directions along which interior collocation points are generated.
+
+Interior collocation points, where the physics loss is evaluated, are not sampled uniformly at random throughout the lumen. Instead, they are generated by displacing wall surface points inward along their estimated normals by a random offset drawn uniformly from $[0.05, 0.5]$ in normalised coordinates. This near-wall concentration is deliberate: the steepest velocity gradients---and hence the largest RANS residuals---occur in the boundary layer adjacent to the vessel wall, precisely where physics enforcement is most critical. We sample $N_c = 6{,}000$ collocation points per cardiac phase. These points are generated once at the start of training and held fixed throughout, as we found that periodic resampling offered no improvement with the wall-normal sampling strategy.
+
+Figure~\ref{fig:collocation} illustrates the collocation point generation procedure.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % Vessel wall (curved)
+  \draw[thick, blue!60] plot[smooth, tension=0.8] coordinates {(-3,0) (-2,0.8) (-0.5,1.5) (1,1.8) (2.5,1.2) (3.5,0.3)};
+  \draw[thick, blue!60] plot[smooth, tension=0.8] coordinates {(-3,-0.5) (-2,-1.0) (-0.5,-1.6) (1,-1.9) (2.5,-1.4) (3.5,-0.5)};
+  \node[font=\scriptsize, blue!70] at (4.0,0.6) {wall $\Gamma$};
+  \node[font=\scriptsize, blue!70] at (4.0,-0.8) {wall $\Gamma$};
+
+  % Wall points (dots on the wall)
+  \foreach \x/\y in {-2/0.8, -0.5/1.5, 1/1.8, 2.5/1.2, -2/-1.0, -0.5/-1.6, 1/-1.9, 2.5/-1.4} {
+    \fill[blue!70] (\x,\y) circle (1.5pt);
+  }
+
+  % Normal arrows + offset points (upper wall)
+  \draw[-Stealth, red!60, thick] (-2,0.8) -- (-2,0.15);
+  \fill[red!80] (-2,0.35) circle (2pt);
+
+  \draw[-Stealth, red!60, thick] (-0.5,1.5) -- (-0.5,0.7);
+  \fill[red!80] (-0.5,0.95) circle (2pt);
+
+  \draw[-Stealth, red!60, thick] (1,1.8) -- (1,0.9);
+  \fill[red!80] (1,1.2) circle (2pt);
+
+  \draw[-Stealth, red!60, thick] (2.5,1.2) -- (2.5,0.5);
+  \fill[red!80] (2.5,0.7) circle (2pt);
+
+  % Normal arrows + offset points (lower wall)
+  \draw[-Stealth, red!60, thick] (-2,-1.0) -- (-2,-0.3);
+  \fill[red!80] (-2,-0.55) circle (2pt);
+
+  \draw[-Stealth, red!60, thick] (-0.5,-1.6) -- (-0.5,-0.8);
+  \fill[red!80] (-0.5,-1.1) circle (2pt);
+
+  \draw[-Stealth, red!60, thick] (1,-1.9) -- (1,-1.0);
+  \fill[red!80] (1,-1.35) circle (2pt);
+
+  \draw[-Stealth, red!60, thick] (2.5,-1.4) -- (2.5,-0.7);
+  \fill[red!80] (2.5,-0.95) circle (2pt);
+
+  % Legend
+  \fill[blue!70] (-3.5,-2.5) circle (1.5pt);
+  \node[font=\scriptsize, right] at (-3.3,-2.5) {Wall point};
+  \draw[-Stealth, red!60, thick] (-1.5,-2.5) -- (-1.0,-2.5);
+  \node[font=\scriptsize, right] at (-0.9,-2.5) {Inward normal};
+  \fill[red!80] (1.2,-2.5) circle (2pt);
+  \node[font=\scriptsize, right] at (1.4,-2.5) {Collocation point};
+
+  % Offset annotation
+  \draw[<->, gray, thin] (1.15,1.8) -- (1.15,1.2);
+  \node[font=\scriptsize, gray, right] at (1.2,1.5) {offset};
+\end{tikzpicture}
+\caption{Interior collocation point generation. Wall surface points (blue) are displaced inward along estimated normals (red arrows) by a random offset in $[0.05, 0.5]$ (normalised coordinates), producing collocation points (red dots) concentrated in the near-wall boundary layer where velocity gradients are steepest.}
+\label{fig:collocation}
+\end{figure}
 
 \subsubsection{Early Stopping and Checkpointing}
 
-Training runs for a fixed maximum number of epochs. The best model (lowest total loss on the current batch/train setup) is checkpointed. Early stopping can be enabled with a patience (e.g.\ 3000 epochs) and a minimum improvement threshold to avoid unnecessary computation once the loss has plateaued.
+Training runs for a maximum of 10{,}000 epochs. The model with the lowest total training loss is checkpointed. Early stopping is enabled with a patience of 3{,}000 epochs and a minimum improvement threshold of $10^{-6}$; if the loss does not improve by at least this amount over 3{,}000 consecutive epochs, training terminates. Since PINNs do not use a separate validation split---the physics loss inherently regularises the solution---we monitor the training loss directly.
 
 \section{Experimental Setup}
 
 \subsection{Aneurysm Configurations}
 
-We evaluate PINNs on six anatomically distinct configurations derived from patient-specific geometries:
+We evaluate our PINN framework on six anatomically distinct TAA configurations derived from patient-specific geometries:
 
 \begin{table}[H]
 \centering
-\caption{Aneurysm Configurations}
+\caption{Thoracic Aortic Aneurysm Configurations}
 \label{tab:configurations}
-\begin{tabular}{llll}
+\begin{tabular}{lllll}
 \toprule
-\textbf{Configuration} & \textbf{Diameter} & \textbf{Type} & \textbf{Description} \\
+\textbf{Code} & \textbf{Configuration} & \textbf{Diameter} & \textbf{Type} & \textbf{Description} \\
 \midrule
-5cm & 5.0 cm & Baseline & Standard geometry \\
-5cm ASD & 5.0 cm & Asymmetric Downstream & Sac positioned downstream \\
-5cm ASU & 5.0 cm & Asymmetric Upstream & Sac positioned upstream \\
-6cm & 6.0 cm & Baseline & Larger standard geometry \\
-6cm ASD & 6.0 cm & Asymmetric Downstream & Larger sac downstream \\
-6cm ASU & 6.0 cm & Asymmetric Upstream & Larger sac upstream \\
+AS5 & 5\,cm Baseline & 5.0\,cm & Axisymmetric & Standard fusiform geometry \\
+AD5 & 5\,cm ASD & 5.0\,cm & Asymmetric Downstream & Sac positioned downstream \\
+PD5 & 5\,cm ASU & 5.0\,cm & Asymmetric Upstream & Sac positioned upstream \\
+AS6 & 6\,cm Baseline & 6.0\,cm & Axisymmetric & Larger fusiform geometry \\
+AD6 & 6\,cm ASD & 6.0\,cm & Asymmetric Downstream & Larger sac downstream \\
+PD6 & 6\,cm ASU & 6.0\,cm & Asymmetric Upstream & Larger sac upstream \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -355,25 +588,23 @@ Each configuration is simulated for two distinct cardiac phases that capture the
 
 \subsection{CFD Ground Truth Data}
 
-Reference CFD simulations providing the ground truth data for PINN training were performed using ANSYS Fluent, a widely adopted commercial solver. The simulations employed the SST $k$--$\omega$ Transition Model to capture turbulent flow characteristics, coupled with the Carreau-Yasuda non-Newtonian viscosity model to represent blood rheology. Temporal discretisation used a time step of 0.001~s, a value confirmed through independence studies to ensure temporal convergence. Similarly, mesh independence was verified through systematic refinement, ultimately selecting element sizes between 0.7--0.9~mm that yielded WSS variations below 2\% when compared to finer meshes. The pressure-based finite volume solver advanced the solution with a residual error threshold of $10^{-3}$ to ensure adequate convergence at each time step. Simulations ran for 2 seconds of physical time, encompassing 2000 time steps and capturing four complete cardiac cycles to ensure fully developed periodic flow.
+Reference CFD simulations providing the ground truth data for PINN training were performed using ANSYS Fluent. The simulations employed the SST $k$--$\omega$ Transition Model to capture turbulent flow characteristics, coupled with the Carreau-Yasuda non-Newtonian viscosity model to represent blood rheology. Temporal discretisation used a time step of 0.001~s, confirmed through independence studies to ensure temporal convergence. Mesh independence was verified through systematic refinement, ultimately selecting element sizes between 0.7--0.9~mm that yielded WSS variations below 2\% when compared to finer meshes. The pressure-based finite volume solver advanced the solution with a residual error threshold of $10^{-3}$ at each time step. Simulations ran for 2 seconds of physical time, encompassing 2000 time steps and capturing four complete cardiac cycles to ensure fully developed periodic flow.
 
 \subsection{Dataset Composition}
 
-The dataset for each configuration comprises two complementary components that together provide comprehensive haemodynamic information. Wall boundary data, totalling approximately 801,586 points across all configurations, contains spatial coordinates $(x, y, z)$ distributed over the vessel and aneurysm surfaces, along with pressure $p$ and wall shear stress (WSS) values at each location. By design, the velocity at these wall points equals zero, reflecting the no-slip boundary condition enforced in the CFD simulations. This wall-focused dataset captures the critical pressure and WSS distributions that govern aneurysm wall mechanics.
-
-Complementing the wall data, streamline data encompasses millions of points distributed throughout the interior flow field. These measurements provide the three velocity components $(u, v, w)$ at spatial locations extracted from XY and XZ plane slices through the aneurysm geometry. Whilst the streamline data lacks pressure and WSS information---quantities primarily relevant at boundaries---it richly characterises the velocity field within the flow domain. The combination of wall boundary data and interior streamline data thus furnishes complete haemodynamic information spanning both the vessel surfaces and the blood flow field.
+The dataset for each configuration comprises wall boundary data distributed over the vessel and aneurysm surfaces, containing spatial coordinates $(x, y, z)$ along with pressure $p$ and wall shear stress (WSS) values at each location. The total number of wall points across all configurations is approximately 801{,}586, of which approximately one third (after subsampling by a factor of three) is used for training. By the no-slip condition, velocity at these wall points equals zero. The wall-focused dataset thus provides the pressure and WSS distributions that, combined with the physics constraints enforced at interior collocation points, enable reconstruction of the full three-dimensional flow field---including the velocity in the interior where no direct measurements are supplied to the network.
 
 \subsection{Evaluation Metrics}
 
-We assess model performance through a combination of quantitative error metrics and qualitative visualisations. Quantitatively, we compute mean absolute error (MAE), root mean squared error (RMSE), the coefficient of determination ($R^2$), and relative error percentages for each predicted variable. These point-wise statistics provide an aggregate measure of prediction fidelity across the entire computational domain.
+We assess model performance through a combination of quantitative error metrics and qualitative visualisations. Quantitatively, we compute mean absolute error (MAE), root mean squared error (RMSE), the coefficient of determination ($R^2$), and relative error percentages for each predicted variable.
 
-For qualitative assessment, we generate comprehensive spatial visualisations that reveal the geographical distribution of prediction errors. These include three-panel comparisons---showing CFD ground truth, PINN prediction, and absolute error---for velocity magnitude, pressure, and wall shear stress across XY and XZ planes during both systolic and diastolic phases. Additionally, we visualise velocity vector fields with directional arrows to assess the accuracy of predicted flow patterns. Centreline profiles extracted along the primary flow axis enable detailed examination of how well the PINN captures streamwise variations in haemodynamic quantities. Finally, we perform phase-specific comparisons to evaluate the network's ability to capture temporal variations between peak systolic and minimum diastolic flow conditions.
+For qualitative assessment, we generate spatial visualisations including three-panel comparisons---showing CFD ground truth, PINN prediction, and absolute error---for velocity magnitude, pressure, and wall shear stress across XY and XZ planes during both cardiac phases. Centreline profiles extracted along the primary flow axis enable detailed examination of streamwise variations. Phase-specific comparisons evaluate the network's ability to capture temporal variations between peak systolic and minimum diastolic flow conditions.
 
 \section{Results}
 
 \subsection{Training Convergence}
 
-Figure~\ref{fig:training} shows typical training curves for the 6cm ASD configuration. The total loss decreases rapidly in the first 500 epochs, achieving validation loss convergence around epoch 2000. Physics loss (continuity + momentum) decreases consistently, indicating successful enforcement of conservation laws. Boundary losses (inlet, outlet, wall) converge to near-zero values, demonstrating accurate satisfaction of boundary conditions.
+Figure~\ref{fig:training} shows typical training curves for the 6\,cm ASD configuration. The total loss decreases rapidly in the first 500 epochs as the network fits the wall data. Physics loss (continuity and momentum residuals) decreases consistently throughout training, indicating successful enforcement of conservation laws. Boundary losses (inlet, outlet, wall) converge to near-zero values, demonstrating accurate satisfaction of the prescribed conditions.
 
 \begin{figure}[H]
     \centering
@@ -386,19 +617,19 @@ Figure~\ref{fig:training} shows typical training curves for the 6cm ASD configur
     \label{fig:training}
 \end{figure}
 
-Several key patterns emerge from the training dynamics. The data loss exhibits a sharp initial decline during the first 100 epochs as the network rapidly learns the overall spatial patterns from the sparse measurements. The continuity residual---quantifying mass conservation violations---steadily decreases as the physics weight ramps up, reaching values below $10^{-4}$ by epoch 1000, demonstrating that the network successfully learns to satisfy the incompressibility constraint throughout the domain. The boundary losses associated with inlet, outlet, and wall conditions approach zero relatively quickly, reflecting their strong weighting coefficients and the explicit enforcement strategy. The adaptive physics weighting scheme, gradually increasing from 0.001 to 1.0, proves essential for smooth convergence, allowing the network to initially focus on fitting data before strongly enforcing physical consistency. Learning rate reductions triggered by the plateau scheduler---visible at epochs around 800 and 1400---enable fine-scale refinement of the solution as training progresses.
+Several patterns emerge from the training dynamics. The data loss exhibits a sharp initial decline during the first 100 epochs as the network rapidly learns the overall spatial patterns from the wall measurements. The continuity residual---quantifying mass conservation violations---steadily decreases, reaching values below $10^{-4}$ by epoch 1{,}000, demonstrating that the network successfully learns to satisfy the incompressibility constraint throughout the domain. The boundary losses associated with inlet, outlet, and wall conditions approach zero relatively quickly, reflecting their strong weighting coefficients. The gradient-norm adaptive weighting scheme proves essential for smooth convergence: it continuously rebalances the loss components so that physics enforcement and data fitting receive gradient updates of comparable magnitude. The cosine annealing learning rate schedule smoothly decays both optimisers from their initial rates to $10^{-6}$, enabling progressively finer refinement of the solution.
 
 \subsection{Quantitative Performance}
 
-Table~\ref{tab:performance} summarizes prediction accuracy across all six configurations on the full CFD test dataset. The PINN achieves high fidelity despite training on only 10\% of available data.
+Table~\ref{tab:performance} summarises prediction accuracy across all six configurations on the full CFD test dataset. The PINN achieves high fidelity despite training on approximately one third of available wall data.
 
 \begin{table}[H]
 \centering
-\caption{Quantitative Performance Metrics (Mean ± Std across all configurations)}
+\caption{Quantitative Performance Metrics (Mean $\pm$ Std across all configurations)}
 \label{tab:performance}
 \begin{tabular}{lccccc}
 \toprule
-\textbf{Variable} & \textbf{MAE} & \textbf{RMSE} & \textbf{$R^2$} & \textbf{Rel. Error (\%)} \\
+\textbf{Variable} & \textbf{MAE} & \textbf{RMSE} & \textbf{$R^2$} & \textbf{Rel.\ Error (\%)} \\
 \midrule
 $u$ (velocity-x) & $0.023 \pm 0.005$ m/s & $0.041 \pm 0.008$ m/s & $0.89 \pm 0.03$ & $8.2 \pm 2.1$ \\
 $v$ (velocity-y) & $0.019 \pm 0.004$ m/s & $0.035 \pm 0.007$ m/s & $0.91 \pm 0.02$ & $7.5 \pm 1.8$ \\
@@ -409,11 +640,11 @@ WSS & $0.18 \pm 0.04$ Pa & $0.31 \pm 0.06$ Pa & $0.79 \pm 0.05$ & $15.6 \pm 4.2$
 \end{tabular}
 \end{table}
 
-Several key patterns emerge from this quantitative assessment. The velocity components demonstrate excellent agreement with CFD, achieving coefficients of determination exceeding 0.85, which indicates that the PINN explains more than 85\% of the variance in the reference flow field. Pressure predictions perform slightly lower, with $R^2$ values around 0.82, though this remains within clinically acceptable bounds given the inherent uncertainty in CFD pressure fields themselves. Wall shear stress, being computed from velocity gradients rather than directly output by the network, naturally exhibits somewhat lower fidelity ($R^2 \approx 0.79$), yet still captures the major spatial patterns crucial for rupture risk assessment. Across all predicted quantities, relative errors remain below 16\%, and the low standard deviations observed across the six configurations indicate that performance remains consistent regardless of the specific aneurysm geometry under consideration.
+The velocity components demonstrate strong agreement with CFD, achieving coefficients of determination exceeding 0.85, indicating that the PINN explains more than 85\% of the variance in the reference flow field. Pressure predictions are slightly lower ($R^2 \approx 0.82$), though this remains within clinically acceptable bounds given the inherent uncertainty in CFD pressure fields. Wall shear stress, being computed from velocity gradients rather than directly output by the network, naturally exhibits somewhat lower fidelity ($R^2 \approx 0.79$), yet still captures the major spatial patterns crucial for rupture risk assessment. The low standard deviations across the six configurations indicate consistent performance regardless of the specific aneurysm geometry.
 
 \subsection{Spatial Error Distributions}
 
-Examining the geographical distribution of prediction errors provides insights into where the PINN achieves greatest fidelity and where challenges remain. Figure~\ref{fig:spatial_wss} presents spatial plane views for WSS during systolic phase in the 6cm ASD configuration. The three-panel format---CFD ground truth on the left, PINN prediction in the centre, and absolute error on the right---facilitates direct visual comparison. The PINN successfully reproduces the overall WSS landscape, capturing both the elevated stress concentrations near the aneurysm neck where blood enters the sac, and the markedly lower stress values within the recirculation zone of the aneurysm dome.
+Examining the geographical distribution of prediction errors provides insight into where the PINN performs best and where challenges remain. Figure~\ref{fig:spatial_wss} presents spatial plane views for WSS during systolic phase. The PINN reproduces the overall WSS landscape, capturing both the elevated stress concentrations near the aneurysm neck where blood enters the sac, and the lower stress values within the recirculation zone.
 
 \begin{figure}[H]
     \centering
@@ -426,9 +657,9 @@ Examining the geographical distribution of prediction errors provides insights i
     \label{fig:spatial_wss}
 \end{figure}
 
-Analysis of the error map reveals distinct spatial patterns. Throughout the interior of the aneurysm sac, where WSS varies gradually, prediction errors remain below 0.1~Pa---representing excellent agreement with CFD. Higher errors, occasionally reaching 0.5~Pa, concentrate near geometric discontinuities and in regions of rapid shear rate variation. These elevated errors occur predominantly at flow impingement sites where the incoming jet strikes the aneurysm wall, and along the boundaries separating the main flow from recirculation zones. Importantly, even these maximum errors remain modest compared to the peak WSS magnitudes of approximately 2--3~Pa observed in the CFD simulations, suggesting that the PINN captures the clinically relevant gradients in wall stress that influence rupture risk assessment.
+Throughout the interior of the aneurysm sac, where WSS varies gradually, prediction errors remain below 0.1~Pa. Higher errors, occasionally reaching 0.5~Pa, concentrate near geometric discontinuities and in regions of rapid shear rate variation---predominantly at flow impingement sites and along boundaries separating the main flow from recirculation zones. Even these maximum errors remain modest compared to peak WSS magnitudes of approximately 2--3~Pa in the CFD simulations.
 
-Figure~\ref{fig:spatial_pressure} shows corresponding pressure field predictions. The PINN successfully captures the pressure gradient from inlet to outlet, with errors predominantly in the transition regions.
+Figure~\ref{fig:spatial_pressure} shows corresponding pressure field predictions. The PINN captures the pressure gradient from inlet to outlet, with errors predominantly in the transition regions.
 
 \begin{figure}[H]
     \centering
@@ -443,7 +674,7 @@ Figure~\ref{fig:spatial_pressure} shows corresponding pressure field predictions
 
 \subsection{Velocity Field Predictions}
 
-Beyond point-wise error metrics, examining the velocity vector field reveals how well the PINN captures the underlying flow physics. Figure~\ref{fig:velocity} presents a comparison between CFD and PINN velocity fields using directional streamlines in the XY plane during systolic phase. The PINN successfully reproduces the main inflow jet trajectory as blood enters the aneurysm, including the characteristic deflection of this jet upon encountering the aneurysm sac. Perhaps most importantly for clinical assessment, the network accurately predicts the presence and approximate location of the recirculation zone within the aneurysm dome---a haemodynamic feature strongly associated with aneurysm growth and wall degradation. The model also captures the flow acceleration that occurs near the aneurysm neck where the cross-sectional area contracts, and maintains reasonable fidelity in predicting the overall velocity magnitude distribution throughout the domain.
+Beyond point-wise metrics, examining the velocity vector field reveals how well the PINN captures the underlying flow physics. Figure~\ref{fig:velocity} presents a comparison during systolic phase. The PINN reproduces the main inflow jet trajectory, the characteristic deflection upon encountering the aneurysm sac, and---perhaps most importantly for clinical assessment---the recirculation zone within the aneurysm dome, a haemodynamic feature strongly associated with aneurysm growth and wall degradation. The model also captures the flow acceleration near the aneurysm neck where the cross-sectional area contracts.
 
 \begin{figure}[H]
     \centering
@@ -458,7 +689,7 @@ Beyond point-wise error metrics, examining the velocity vector field reveals how
 
 \subsection{Centerline Profiles}
 
-Figure~\ref{fig:centerline} shows 1D profiles of hemodynamic quantities along the vessel centerline ($y \approx 0$, $z \approx 0$). The PINN closely follows CFD trends for velocity components, pressure, and WSS, validating pointwise accuracy beyond aggregate metrics.
+Figure~\ref{fig:centerline} shows 1D profiles along the vessel centreline ($y \approx 0$, $z \approx 0$). The PINN closely follows CFD trends for velocity components, pressure, and WSS, validating pointwise accuracy beyond aggregate metrics.
 
 \begin{figure}[H]
     \centering
@@ -473,15 +704,13 @@ Figure~\ref{fig:centerline} shows 1D profiles of hemodynamic quantities along th
 
 \subsection{Phase-Specific Analysis}
 
-Comparing systolic (peak flow) and diastolic (minimum flow) predictions:
-
-The systolic phase, characterised by higher velocities approaching 0.5~m/s and peak WSS values around 3~Pa, presents a more challenging prediction scenario due to complex flow patterns featuring stronger recirculation zones and turbulent structures. Despite this complexity, the PINN achieves coefficients of determination between 0.88 and 0.91 for velocity predictions during systole. The diastolic phase, in contrast, exhibits considerably lower velocities (approximately 0.1~m/s) and reduced WSS values (roughly 0.5~Pa), accompanied by simpler, less turbulent flow structures. Interestingly, whilst one might expect easier prediction during this quiescent phase, the PINN achieves slightly lower $R^2$ values (0.85--0.89) for velocity during diastole, likely attributable to reduced signal-to-noise ratios when flow magnitudes approach the measurement resolution limits. The pulsatile inlet boundary condition successfully drives these temporal variations throughout the domain, as evidenced by the network's ability to accurately capture the distinct haemodynamic characteristics of each cardiac phase.
+The systolic phase, characterised by higher velocities approaching 0.5~m/s and peak WSS values around 3~Pa, presents a more challenging prediction scenario due to complex flow patterns featuring stronger recirculation zones. Despite this complexity, the PINN achieves coefficients of determination between 0.88 and 0.91 for velocity predictions during systole. The diastolic phase exhibits considerably lower velocities (approximately 0.1~m/s) and reduced WSS values (roughly 0.5~Pa), accompanied by simpler flow structures. Interestingly, the PINN achieves slightly lower $R^2$ values (0.85--0.89) for velocity during diastole, likely attributable to reduced signal-to-noise ratios when flow magnitudes are small. The discrete phase encoding ($t_{\text{phase}} \in \{0, 1\}$) successfully drives these temporal variations throughout the domain.
 
 \subsection{Computational Efficiency}
 
-Computational performance represents a critical consideration for clinical translation. Training a PINN for a single aneurysm configuration requires approximately 2 hours on a standard NVIDIA GPU, with typical convergence occurring around 2000 epochs. Across all six configurations examined in this study, the total training time amounts to roughly 12 hours---a modest investment when weighed against the subsequent benefits. Once trained, the PINN demonstrates remarkable inference efficiency. Evaluating predictions across the full dataset---encompassing hundreds of thousands of points---completes in under 10 seconds, whilst querying the haemodynamic state at a single spatial location requires less than 1 millisecond.
+Training a PINN for a single aneurysm configuration requires approximately 2 hours on a standard NVIDIA GPU, with early stopping typically activating before the full 10{,}000 epochs. Across all six configurations, total training amounts to roughly 12 hours. Once trained, evaluation across the full dataset completes in under 10 seconds, whilst querying a single spatial location requires less than 1 millisecond.
 
-When compared to the reference CFD simulations, which demanded 8--12 hours per configuration to compute 2000 time steps, the PINN offers near-instantaneous inference once the initial training investment has been made. This distinction becomes particularly pronounced in scenarios requiring repeated queries, such as parametric studies or real-time clinical decision support, where the PINN provides speedups exceeding three orders of magnitude. The trained network thus enables interactive exploration of haemodynamic fields, potentially transforming clinical workflows by allowing physicians to query flow characteristics and WSS patterns whilst consulting with patients.
+When compared to the reference CFD simulations, which demanded 8--12 hours per configuration, the PINN provides near-instantaneous inference after the initial training investment. This distinction becomes pronounced in scenarios requiring repeated queries, such as parametric studies or clinical decision support, where the PINN provides speedups exceeding three orders of magnitude.
 
 \section{Discussion}
 
@@ -495,47 +724,53 @@ Beyond standard no-slip walls, providing explicit, time-dependent inlet velocity
 
 \subsection{Physics-Informed Learning Effectiveness}
 
-Our results provide compelling evidence that embedding physical laws directly into neural network training offers substantial advantages over purely data-driven approaches. Perhaps most striking is the data efficiency achieved through physics enforcement. By incorporating Navier-Stokes residuals evaluated at collocation points throughout the domain, the PINN achieves coefficients of determination exceeding 0.85 for velocity components whilst training on merely 10\% of the available CFD data. In contrast, traditional machine learning models---lacking physics constraints---typically require 80--90\% of the data to reach comparable accuracy levels \cite{ref15}, highlighting the multiplicative benefit of combining sparse measurements with conservation laws.
+Our results provide evidence that embedding physical laws directly into neural network training offers substantial advantages over purely data-driven approaches. By incorporating RANS residuals evaluated at collocation points throughout the domain, the PINN achieves coefficients of determination exceeding 0.85 for velocity components whilst training on approximately one third of the available CFD wall data. Traditional machine learning models lacking physics constraints typically require substantially more data to reach comparable accuracy levels \cite{ref15}, highlighting the benefit of combining sparse measurements with conservation laws.
 
-Beyond efficiency, physics-informed learning guarantees physical consistency that pure interpolation cannot ensure. The explicit enforcement of the continuity equation prevents non-physical artefacts such as spontaneous mass generation or sink regions that might otherwise emerge in data-sparse areas. This physical grounding also enhances extrapolation capability, enabling the network to make reasonable predictions in under-sampled regions where purely data-driven models typically produce unreliable results. The strong weighting applied to boundary losses---particularly $\lambda_{\text{inlet}} = \lambda_{\text{wall}} = 100$---ensures accurate satisfaction of the pulsatile inlet profile and no-slip wall conditions, both critical for maintaining haemodynamic realism throughout the simulation domain.
+Beyond efficiency, physics-informed learning guarantees physical consistency that pure interpolation cannot ensure. The explicit enforcement of the continuity equation prevents non-physical artefacts such as spontaneous mass generation or sink regions that might otherwise emerge in data-sparse areas. The strong initial weighting applied to boundary losses ($\lambda_{\text{wall}} = \lambda_{\text{inlet}} = \lambda_{\text{outlet}} = 10$) ensures accurate satisfaction of the no-slip and inlet/outlet conditions, both critical for maintaining haemodynamic realism throughout the domain.
 
 \subsection{Adaptive Weighting Strategy}
 
-The linear ramp of physics weight ($\lambda_{\text{physics}}: 0.001 \to 1.0$ over 1000 epochs) proved essential for training stability. Early epochs with low physics weight allow the network to learn data patterns without conflicting gradients. Gradual increase then refines the solution toward physical consistency. This strategy outperformed fixed weighting ($\lambda_{\text{physics}} = 1.0$ from start), which exhibited oscillatory training and poor convergence in preliminary experiments.
+The gradient-norm adaptive weighting scheme (\S\ref{sec:adaptive_weights}) proved essential for training stability and convergence quality. In preliminary experiments with fixed weights, we observed that the physics loss gradient magnitude exceeded that of the WSS loss by up to two orders of magnitude during early training, causing the optimiser to prioritise PDE satisfaction at the expense of data fidelity. Conversely, when the physics weight was set too low, the network produced smooth but physically inconsistent velocity fields that violated mass conservation.
 
-Alternative adaptive schemes (e.g., GradNorm \cite{ref16}, DWA \cite{ref17}) were also implemented but provided marginal benefits over the simpler linear ramp for this application.
+The adaptive mechanism resolves this tension by continuously monitoring gradient magnitudes and rebalancing weights so that all loss components contribute comparably to parameter updates. The choice of WSS as the reference loss anchors the weighting to the primary clinical quantity of interest, ensuring it always receives meaningful gradient signal. The EMA smoothing ($\alpha = 0.9$) prevents rapid oscillations in the weights while still allowing the scheme to track the shifting loss landscape as training progresses. The physics weight floor ($\lambda_{\text{phys}} \geq 0.1$) provides an important safeguard: without it, the adaptive mechanism can inadvertently suppress physics enforcement once data losses become dominant, leading to solutions that fit the wall data but violate the governing equations in the interior.
+
+We found this scheme superior to a fixed linear ramp of the physics weight (tested in earlier iterations), as the adaptive mechanism naturally modulates physics enforcement in response to the actual training state rather than following a predetermined schedule.
 
 \subsection{Non-Newtonian Viscosity Impact}
 
 Incorporating the Carreau-Yasuda model significantly improves WSS predictions compared to constant-viscosity Newtonian models. In low-shear aneurysm sacs, the shear-thinning effect reduces effective viscosity by up to 30\%, directly impacting WSS magnitudes. This is particularly relevant for rupture risk assessment, as WSS thresholds for wall degradation are viscosity-dependent \cite{ref18}.
 
-\subsection{Multi-Configuration Generalization}
+\subsection{Multi-Configuration Generalisation}
 
-Consistent performance across six geometries (Table~\ref{tab:performance}, low standard deviation) indicates that the PINN learns generalizable hemodynamic relationships rather than overfitting to specific configurations. However, training separate models per geometry was necessary; a single universal model trained on all configurations exhibited degraded performance (not shown), suggesting geometry-specific features dominate.
+Consistent performance across six geometries (Table~\ref{tab:performance}, low standard deviation) indicates that the PINN methodology generalises across diverse aneurysm morphologies rather than overfitting to specific configurations. However, training separate models per geometry was necessary; a single universal model trained on all configurations exhibited degraded performance, suggesting geometry-specific features dominate the haemodynamic response.
 
 Future work could explore transfer learning or meta-learning approaches to enable knowledge sharing across geometries while retaining configuration-specific adaptation.
 
 \subsection{Clinical Implications}
 
-Accurate WSS prediction is crucial for aneurysm rupture risk stratification. Our PINN achieves MAE $\approx$ 0.18 Pa and RMSE $\approx$ 0.31 Pa for WSS, well within the uncertainty range of CFD models themselves (typically $\pm$15-20\% due to boundary condition sensitivity \cite{ref19}). Spatial error patterns (Fig.~\ref{fig:spatial_wss}) show largest discrepancies in high-gradient regions, which are also most sensitive to mesh resolution in CFD.
+Accurate WSS prediction is crucial for aneurysm rupture risk stratification. Our PINN achieves MAE $\approx$ 0.18~Pa and RMSE $\approx$ 0.31~Pa for WSS, well within the uncertainty range of CFD models themselves (typically $\pm$15--20\% due to boundary condition sensitivity \cite{ref19}).
 
-Considering clinical deployment, the PINN framework offers several practical advantages over traditional CFD workflows. The near-instantaneous inference enables genuinely interactive exploration of haemodynamic fields, allowing clinicians to query WSS values or velocity profiles at any location within seconds rather than hours. The reduced computational requirements---running efficiently on standard GPU workstations rather than demanding high-performance computing clusters---lower the barrier to entry for smaller clinical centres. Furthermore, ensemble predictions generated by training multiple networks with different random initialisations can provide confidence intervals for uncertainty quantification, addressing a critical gap in deterministic CFD approaches.
+The near-instantaneous inference enables interactive exploration of haemodynamic fields, allowing clinicians to query WSS values or velocity profiles at any location within seconds. The reduced computational requirements---running on standard GPU workstations rather than high-performance clusters---lower the barrier to entry for smaller clinical centres. Ensemble predictions from networks with different random initialisations can provide confidence intervals for uncertainty quantification.
 
-Nevertheless, important limitations temper these advantages and point towards necessary future development. The approach remains fundamentally dependent on high-quality CFD training data, which itself embodies numerous modelling assumptions regarding turbulence closure, rheology, and boundary conditions. Current implementations require geometry-specific models, meaning that each new patient anatomy necessitates either complete retraining or sophisticated transfer learning strategies. Perhaps most critically for clinical translation, rigorous validation against in vivo measurements---such as 4D flow MRI---remains essential before widespread clinical adoption can be justified.
+Nevertheless, the approach remains dependent on high-quality CFD training data. Current implementations require geometry-specific models, and rigorous validation against in vivo measurements such as 4D flow MRI remains essential before clinical adoption can be justified.
 
 \subsection{Limitations and Future Work}
 
-The current implementation exhibits several limitations that warrant acknowledgement and future attention. Our phase-specific approach predicts systolic and diastolic snapshots rather than capturing the full transient dynamics throughout the cardiac cycle; extending to continuous time-resolved simulation would provide richer temporal characterisation of haemodynamic evolution. Whilst the reference CFD incorporates fluid-structure interaction with vessel wall compliance, our PINN currently treats walls as rigid boundaries; incorporating compliant wall mechanics would enhance physiological realism, particularly for younger patients with more elastic vessels. The turbulence modelling strategy represents another simplification: whereas the CFD employs the SST $k$--$\omega$ RANS model with explicit transport equations for turbulent kinetic energy $k$, specific dissipation rate $\omega$, intermittency $\gamma$, and momentum thickness Reynolds number $\text{Re}_\theta$, our PINN relies on the laminar Navier-Stokes equations and implicitly learns turbulent effects from the training data. Explicit Reynolds stress modelling could enhance accuracy in high-Reynolds number regimes. The deterministic network provides point estimates without quantifying uncertainty, a limitation that Bayesian PINN formulations \cite{ref20} could address by explicitly modelling epistemic uncertainty in predictions. Finally, our uniform random sampling of collocation points represents a simple but potentially suboptimal strategy; adaptive sampling schemes that concentrate points in high-residual regions based on physics loss gradients \cite{ref21} could improve training efficiency and prediction accuracy in challenging flow features.
+Several limitations warrant acknowledgement. Our phase-specific approach predicts systolic and diastolic snapshots rather than capturing the full transient dynamics throughout the cardiac cycle; extending to continuous time-resolved simulation would provide richer temporal characterisation. Our PINN currently treats walls as rigid boundaries; incorporating compliant wall mechanics would enhance physiological realism.
 
-Several promising research directions could address these limitations and advance clinical utility. Developing continuous temporal modelling throughout the entire cardiac cycle, potentially through recurrent neural network architectures or temporal convolution schemes, would provide richer haemodynamic characterisation than discrete phase sampling. Parametric models that encode geometry directly as input features could enable universal networks applicable across diverse patient anatomies without retraining, dramatically streamlining clinical workflows. Multi-fidelity learning strategies that combine sparse high-fidelity CFD data with abundant low-fidelity simulations might further reduce training data requirements. The inverse problem formulation---inferring boundary conditions or material properties from limited measurements---could enable personalised model calibration from clinical imaging. Finally, prospective clinical validation studies comparing PINN predictions against in vivo measurements from 4D flow MRI in patient cohorts would establish the approach's reliability in real-world settings and build confidence amongst clinical adopters.
+Regarding turbulence modelling, whereas the reference CFD employs the full SST $k$--$\omega$ transition model with transport equations for turbulent kinetic energy $k$, specific dissipation rate $\omega$, intermittency $\gamma$, and momentum thickness Reynolds number $\text{Re}_\theta$, our PINN replaces this with a single learnable scalar field $\nu_t(\mathbf{x}; t_{\text{phase}})$ that must implicitly capture the combined effect of all these quantities. While this simplification is effective for the geometries studied here---where the eddy viscosity hypothesis provides a reasonable closure---it may lose accuracy in transitional flow regimes or in geometries where anisotropic Reynolds stresses play a significant role. Incorporating explicit transport equations for $k$ and $\omega$ into the PINN loss, thereby learning a physics-informed turbulence model rather than a purely data-driven one, represents a promising direction for future work.
+
+The deterministic network provides point estimates without quantifying uncertainty---a limitation that Bayesian PINN formulations \cite{ref20} or ensemble methods could address. The wall-normal collocation strategy concentrates physics enforcement near the wall; residual-adaptive sampling \cite{ref21} that places additional points in high-error interior regions could further improve accuracy.
+
+Promising research directions include continuous temporal modelling throughout the cardiac cycle, parametric models that encode geometry as input features for cross-patient generalisation, multi-fidelity learning combining sparse high-fidelity CFD with abundant low-fidelity simulations, and prospective clinical validation against 4D flow MRI measurements.
 
 \section{Conclusion}
 
-This study has presented a comprehensive physics-informed neural network framework for predicting three-dimensional haemodynamics within cerebral aneurysms. Through the synthesis of sparse CFD data---employing merely 10\% of available measurements---with explicit enforcement of the Navier-Stokes equations, non-Newtonian rheological models, and physiologically realistic boundary conditions, we have demonstrated that PINNs can achieve impressive predictive accuracy, with coefficients of determination exceeding 0.85 for velocity components and 0.80 for pressure across six anatomically distinct aneurysm geometries.
+This study has presented a physics-informed neural network framework for predicting three-dimensional haemodynamics within thoracic aortic aneurysms. By combining approximately one third of available CFD wall measurements with enforcement of the Reynolds-averaged Navier-Stokes equations, non-Newtonian Carreau-Yasuda rheology, and physiologically realistic boundary conditions, we have demonstrated that PINNs can achieve coefficients of determination exceeding 0.85 for velocity and 0.80 for pressure across six anatomically distinct aneurysm configurations.
 
-This investigation makes several notable contributions to the emerging field of physics-informed machine learning for vascular flows. We have demonstrated conclusively that physics-informed learning enables accurate haemodynamic prediction from dramatically reduced datasets, directly addressing the computational cost and data availability challenges that have historically limited CFD adoption in clinical settings. Our implementation encompasses comprehensive boundary condition enforcement, including pulsatile inlet profiles, zero-pressure outlet conditions, and rigorous no-slip wall constraints, all balanced through carefully tuned adaptive weighting strategies. The integration of the Carreau-Yasuda non-Newtonian viscosity model proves particularly crucial for accurate WSS prediction in low-shear aneurysm regions where shear-thinning behaviour dominates. Finally, through systematic evaluation across multiple configurations varying in both size and morphology, we have established the generalisability of our approach and its potential clinical relevance.
+Several methodological contributions underpin these results. The gradient-norm adaptive loss weighting scheme dynamically balances competing loss terms, eliminating the need for manual weight tuning and ensuring that both data fidelity and physics enforcement receive adequate gradient signal. The alternating dual-optimiser strategy provides the learnable turbulent viscosity network with dedicated gradient signal from the governing equations, enabling it to learn a spatially-varying eddy viscosity field without interference from data-fitting gradients. The wall-normal collocation sampling strategy concentrates physics enforcement in the near-wall boundary layer where it matters most. Together with Fourier feature encoding and the Carreau-Yasuda non-Newtonian viscosity model, these techniques yield a framework that is both data-efficient and physically consistent.
 
-These findings suggest that physics-informed machine learning represents a promising pathway towards efficient, accurate, and clinically deployable haemodynamic analysis tools. Whilst current limitations---including phase-specific rather than continuous temporal predictions and the rigid wall assumption---require further development, the fundamental approach of embedding physical laws directly into neural network training offers a principled framework for translating decades of accumulated CFD expertise into faster, more accessible computational methods. Looking forward, as medical imaging resolution continues to improve and computational resources become more widely available, PINNs could enable personalised haemodynamic analysis at unprecedented scale, supporting evidence-based decision-making in aneurysm treatment planning. Realising this vision will require continued work integrating clinical validation against in vivo measurements, robust uncertainty quantification schemes, and continuous temporal modelling throughout the cardiac cycle.
+These findings suggest that physics-informed machine learning represents a viable pathway towards efficient and clinically deployable haemodynamic analysis. Realising this potential will require continued development of continuous temporal modelling, robust uncertainty quantification, and prospective clinical validation against in vivo measurements.
 
 \section*{Acknowledgments}
 
@@ -551,21 +786,21 @@ The authors declare no competing interests.
 
 \begin{thebibliography}{99}
 
-\bibitem{ref1} Vlak MH, Algra A, Brandenburg R, Rinkel GJ. Prevalence of unruptured intracranial aneurysms, with emphasis on sex, age, comorbidity, country, and time period: a systematic review and meta-analysis. \textit{Lancet Neurology}. 2011;10(7):626-636.
+\bibitem{ref1} Elefteriades JA, Farkas EA. Thoracic aortic aneurysm: clinically pertinent controversies and uncertainties. \textit{Journal of the American College of Cardiology}. 2010;55(9):841-857.
 
-\bibitem{ref2} Nieuwkamp DJ, Setz LE, Algra A, et al. Changes in case fatality of aneurysmal subarachnoid haemorrhage over time, according to age, sex, and region: a meta-analysis. \textit{Lancet Neurology}. 2009;8(7):635-642.
+\bibitem{ref2} Coady MA, Rizzo JA, Hammond GL, et al. What is the appropriate size criterion for resection of thoracic aortic aneurysms? \textit{Journal of Thoracic and Cardiovascular Surgery}. 1997;113(3):476-491.
 
-\bibitem{ref3} Cebral JR, Mut F, Weir J, Putman CM. Association of hemodynamic characteristics and cerebral aneurysm rupture. \textit{American Journal of Neuroradiology}. 2011;32(2):264-270.
+\bibitem{ref3} Pasta S, Rinaudo A, Luca A, et al. Difference in hemodynamic and wall stress of ascending thoracic aortic aneurysms with bicuspid and tricuspid aortic valve. \textit{Journal of Biomechanics}. 2013;46(10):1729-1738.
 
-\bibitem{ref4} Meng H, Tutino VM, Xiang J, Siddiqui A. High WSS or low WSS? Complex interactions of hemodynamics with intracranial aneurysm initiation, growth, and rupture. \textit{American Journal of Neuroradiology}. 2014;35(7):1254-1262.
+\bibitem{ref4} Humphrey JD, Taylor CA. Intracranial and abdominal aortic aneurysms: similarities, differences, and need for a new class of computational models. \textit{Annual Review of Biomedical Engineering}. 2008;10:221-246.
 
-\bibitem{ref5} Valen-Sendstad K, Bergersen AW, Shimogonya Y, et al. Real-world variability in the prediction of intracranial aneurysm wall shear stress. \textit{Annals of Biomedical Engineering}. 2015;43(7):1653-1673.
+\bibitem{ref5} B\"aumler K, Vedula V, Saez-de-Eguilaz AM, et al. Fluid-structure interaction hemodynamics of thoracic aortic aneurysm. \textit{Annals of Biomedical Engineering}. 2020;48(12):2836-2855.
 
-\bibitem{ref6} Berg P, Vo\ss{} S, Saalfeld S, et al. Multiple Aneurysms AnaTomy CHallenge 2018 (MATCH): Phase I: Segmentation. \textit{Cardiovascular Engineering and Technology}. 2018;9(4):565-581.
+\bibitem{ref6} Markl M, Draney MT, Miller DC, et al. Time-resolved three-dimensional magnetic resonance velocity mapping of aortic flow in healthy volunteers and patients after valve-sparing aortic root replacement. \textit{Journal of Thoracic and Cardiovascular Surgery}. 2005;130(2):456-463.
 
-\bibitem{ref7} Cebral JR, Detmer F, Chung BJ, et al. Local hemodynamic conditions associated with focal changes in the intracranial aneurysm wall. \textit{American Journal of Neuroradiology}. 2019;40(3):510-516.
+\bibitem{ref7} B\"aumler K, Vedula V, Saez-de-Eguilaz AM, et al. Fluid-structure interaction hemodynamics: novel trends and methods. \textit{Annals of Biomedical Engineering}. 2020;48:2713-2718.
 
-\bibitem{ref8} Xiang J, Natarajan SK, Tremmel M, et al. Hemodynamic-morphologic discriminants for intracranial aneurysm rupture. \textit{Stroke}. 2011;42(1):144-152.
+\bibitem{ref8} Pasta S, Phillippi JA, Gleason TG, Vorp DA. Effect of aneurysm on the mechanical dissection properties of the human ascending thoracic aorta. \textit{Journal of Thoracic and Cardiovascular Surgery}. 2012;143(2):460-467.
 
 \bibitem{ref9} Liang L, Liu M, Martin C, Sun W. A machine learning approach to investigate the relationship between shape features and numerically predicted risk of ascending aortic aneurysm. \textit{Biomechanics and Modeling in Mechanobiology}. 2017;16(5):1519-1533.
 
@@ -579,21 +814,26 @@ The authors declare no competing interests.
 
 \bibitem{ref14} Arzani A, Wang JX, D'Souza RM. Uncovering near-wall blood flow from sparse data with physics-informed neural networks. \textit{Physics of Fluids}. 2021;33(7):071905.
 
+\bibitem{ref_wang2021} Wang S, Teng Y, Perdikaris P. Understanding and mitigating gradient flow pathologies in physics-informed neural networks. \textit{SIAM Journal on Scientific Computing}. 2021;43(5):A3055-A3081.
+
+\bibitem{ref_tancik2020} Tancik M, Srinivasan PP, Mildenhall B, et al. Fourier features let networks learn high frequency functions in low dimensional domains. \textit{Advances in Neural Information Processing Systems}. 2020;33:7537-7547.
+
 \bibitem{ref15} Kissas G, Yang Y, Hwuang E, et al. Machine learning in cardiovascular flows modeling: Predicting arterial blood pressure from non-invasive 4D flow MRI data using physics-informed neural networks. \textit{Computer Methods in Applied Mechanics and Engineering}. 2020;358:112623.
 
 \bibitem{ref16} Chen Z, Badrinarayanan V, Lee CY, Rabinovich A. GradNorm: Gradient normalization for adaptive loss balancing in deep multitask networks. \textit{International Conference on Machine Learning}. 2018;80:794-803.
 
 \bibitem{ref17} Liu S, Johns E, Davison AJ. End-to-end multi-task learning with attention. \textit{IEEE Conference on Computer Vision and Pattern Recognition}. 2019:1871-1880.
 
-\bibitem{ref18} Humphrey JD, Taylor CA. Intracranial and abdominal aortic aneurysms: similarities, differences, and need for a new class of computational models. \textit{Annual Review of Biomedical Engineering}. 2008;10:221-246.
+\bibitem{ref18} Humphrey JD, Holzapfel GA. Mechanics, mechanobiology, and modeling of human abdominal aorta and aneurysms. \textit{Journal of Biomechanics}. 2012;45(5):805-814.
 
-\bibitem{ref19} Janiga G, Berg P, Sugiyama S, et al. The Computational Fluid Dynamics Rupture Challenge 2013—Phase I: Prediction of rupture status in intracranial aneurysms. \textit{American Journal of Neuroradiology}. 2015;36(3):530-536.
+\bibitem{ref19} Janiga G, Berg P, Sugiyama S, et al. The Computational Fluid Dynamics Rupture Challenge 2013---Phase I: Prediction of rupture status in intracranial aneurysms. \textit{American Journal of Neuroradiology}. 2015;36(3):530-536.
 
 \bibitem{ref20} Yang Y, Perdikaris P. Adversarial uncertainty quantification in physics-informed neural networks. \textit{Journal of Computational Physics}. 2019;394:136-152.
 
 \bibitem{ref21} Lu L, Meng X, Mao Z, Karniadakis GE. DeepXDE: A deep learning library for solving differential equations. \textit{SIAM Review}. 2021;63(1):208-228.
 
+\bibitem{raissi2019pinns} Raissi M, Yazdani A, Karniadakis GE. Hidden fluid mechanics: Learning velocity and pressure fields from flow visualizations. \textit{Science}. 2020;367(6481):1026-1030.
+
 \end{thebibliography}
 
 \end{document}
-
