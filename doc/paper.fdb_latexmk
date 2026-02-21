@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1771637117.51052 "c:/Users/ajaoo/Documents/GitHub/TAA-aneurysm/doc/paper.tex" "paper.pdf" "paper" 1771637124.39325 0
+["pdflatex"] 1771638723.86733 "c:/Users/ajaoo/Documents/GitHub/TAA-aneurysm/doc/paper.tex" "paper.pdf" "paper" 1771638731.3767 0
   "../experiments/AD5/figures/AD5_diastolic_WSS_magnitude_xy.png" 1771622050 1814848 f5d24bed745a7fbed8fe95a7b26e509a ""
   "../experiments/AD5/figures/AD5_systolic_Pressure_xy.png" 1771622050 1797748 3475dca0857a603fd1718cc126d7ba51 ""
   "../experiments/AD5/figures/AD5_systolic_WSS_magnitude_3d.png" 1771622050 597817 a56f3ee10d0479c697ef5dd95f2e48eb ""
@@ -222,10 +222,10 @@
   "C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/tex/latex/translations/translations.sty" 1644048522 44247 2188b95d0ee74e31eca4d316263c58a7 ""
   "C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/tex/latex/url/url.sty" 1388490452 12796 8edb7d69a20b857904dd0ea757c14ec9 ""
   "C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/tex/latex/xcolor/xcolor.sty" 1729265222 55384 b454dec21c2d9f45ec0b793f0995b992 ""
-  "c:/Users/ajaoo/Documents/GitHub/TAA-aneurysm/doc/paper.tex" 1771637069 98967 8ec33a543cf7ea47bd81b135e9aaff23 ""
-  "paper.aux" 1771637124 24267 83dd0141c120aa202c74fc783c3f8d15 "pdflatex"
-  "paper.out" 1771637124 10217 62a6a8dd9fdc7e09fbe283c708d95d41 "pdflatex"
-  "paper.tex" 1771637069 98967 8ec33a543cf7ea47bd81b135e9aaff23 ""
+  "c:/Users/ajaoo/Documents/GitHub/TAA-aneurysm/doc/paper.tex" 1771638692 98930 bc84d2b914b20c63b6650b6a9eeb9286 ""
+  "paper.aux" 1771638731 21688 18d360625d4ee0083c178aebda961dca "pdflatex"
+  "paper.out" 1771638731 9858 6a7d837039c40dce00dcaee6f3e176ca "pdflatex"
+  "paper.tex" 1771638692 98930 bc84d2b914b20c63b6650b6a9eeb9286 ""
   (generated)
   "paper.aux"
   "paper.log"
