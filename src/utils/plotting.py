@@ -502,10 +502,250 @@ def generate_publication_loss_plots(geom, out_dir=None):
     print(f"  Publication loss plots saved to {out_dir}")
 
 
+# ── Metric helpers ─────────────────────────────────────────────────────────
+
+def _r2(y_true, y_pred):
+    ss_res = np.sum((y_true - y_pred) ** 2)
+    ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
+    return 1.0 - ss_res / (ss_tot + 1e-12)
+
+
+def _rel_error_pct(y_true, y_pred):
+    return np.linalg.norm(y_pred - y_true) / (np.linalg.norm(y_true) + 1e-12) * 100.0
+
+
+# ── Recompute full metrics from checkpoint ─────────────────────────────────
+
+def compute_metrics_from_checkpoint(geom, checkpoint_path=None, device="cuda"):
+    """Load a checkpoint, run inference, and return per-phase metrics in physical units.
+
+    Returns a list of dicts (one per phase) with WSS and pressure metrics.
+    """
+    info = GEOM_INFO[geom]
+    exp_dir = PROJECT_ROOT / "experiments" / geom
+    config_path = PROJECT_ROOT / info["config"]
+
+    if checkpoint_path is None:
+        for name in ["best_model.pt", "final_model.pt"]:
+            candidate = exp_dir / name
+            if candidate.exists():
+                checkpoint_path = str(candidate)
+                break
+    if checkpoint_path is None:
+        print(f"  [SKIP] No checkpoint found for {geom}")
+        return []
+
+    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    cfg = ckpt["config"]
+    model_cfg = cfg["model"]
+    norm = cfg["data"]["normalization"]
+    nut_cfg = model_cfg.get("nut", {})
+
+    networks = create_taa_networks(
+        input_dim=model_cfg.get("input_dim", 4),
+        hidden_dim=model_cfg.get("hidden_dim", 256),
+        num_layers=model_cfg.get("num_layers", 10),
+        num_frequencies=model_cfg.get("num_frequencies", 32),
+        fourier_scale=model_cfg.get("fourier_scale", 10.0),
+        use_fourier=model_cfg.get("use_fourier", True),
+        nut_hidden_dim=nut_cfg.get("hidden_dim", 64),
+        nut_num_layers=nut_cfg.get("num_layers", 4),
+        device=device,
+    )
+    for name, net in networks.items():
+        if name in ckpt["networks"]:
+            net.load_state_dict(ckpt["networks"][name])
+        net.eval()
+
+    L = norm["length_scale"]
+    ref_scales = ckpt.get("ref_scales", {})
+    P_ref = ref_scales.get("P_ref", 1.0)
+    tau_ref = ref_scales.get("tau_ref", 1.0)
+    wss_std = ref_scales.get("wss_std", 1.0)
+    pressure_std = ref_scales.get("pressure_std", 1.0)
+    coord_scale = ref_scales.get("coord_scale", 1.0)
+
+    if config_path.exists():
+        with open(config_path) as f:
+            geom_cfg = yaml.safe_load(f)
+        normal_radius = geom_cfg["geometry"]["normal_estimation"]["radius"]
+        normal_max_nn = geom_cfg["geometry"]["normal_estimation"]["max_nn"]
+    else:
+        normal_radius = 0.01
+        normal_max_nn = 30
+
+    epoch = ckpt.get("epoch", 0)
+    results = []
+
+    for phase, filename in info["files"].items():
+        filepath = str(PROJECT_ROOT / "data" / filename)
+        df_full = load_csv_data(filepath, subsample_factor=1)
+        full_data = prepare_data(df_full, L, coord_scale=coord_scale)
+        coords_norm = full_data['coords_norm']
+        n_pts = coords_norm.shape[0]
+
+        cfd_pressure = full_data['pressure_raw']
+        cfd_wss_mag = full_data['wss_magnitude_raw']
+        cfd_wss_x = full_data['wss_x_raw']
+        cfd_wss_y = full_data['wss_y_raw']
+        cfd_wss_z = full_data['wss_z_raw']
+
+        x = torch.tensor(coords_norm[:, 0:1], dtype=torch.float32, device=device)
+        y = torch.tensor(coords_norm[:, 1:2], dtype=torch.float32, device=device)
+        z = torch.tensor(coords_norm[:, 2:3], dtype=torch.float32, device=device)
+        phase_val = 1.0 if phase == "systolic" else 0.0
+        t = torch.full((n_pts, 1), phase_val, dtype=torch.float32, device=device)
+
+        normals = compute_wall_normals_torch(
+            x, y, z, radius=normal_radius, max_nn=normal_max_nn, device=device,
+        )
+
+        batch = 4000
+        wss_x_l, wss_y_l, wss_z_l, wss_m_l, p_l = [], [], [], [], []
+        for i in range(0, n_pts, batch):
+            j = min(i + batch, n_pts)
+            wx, wy, wz, wm, pp = compute_wss_from_networks(
+                networks, x[i:j], y[i:j], z[i:j], t[i:j], normals[i:j],
+                tau_ref=tau_ref, wss_std=wss_std, pressure_std=pressure_std,
+                coord_scale=coord_scale,
+            )
+            wss_x_l.append(wx.cpu().numpy().flatten())
+            wss_y_l.append(wy.cpu().numpy().flatten())
+            wss_z_l.append(wz.cpu().numpy().flatten())
+            wss_m_l.append(wm.cpu().numpy().flatten())
+            p_l.append(pp.cpu().numpy().flatten())
+
+        pinn_wss_x = np.concatenate(wss_x_l)
+        pinn_wss_y = np.concatenate(wss_y_l)
+        pinn_wss_z = np.concatenate(wss_z_l)
+        pinn_wss_mag = np.concatenate(wss_m_l)
+        pinn_pressure = np.concatenate(p_l) * pressure_std * P_ref
+
+        row = {
+            "geometry": geom,
+            "phase": phase,
+            "epoch": epoch,
+            # WSS magnitude (Pa)
+            "wss_mae": float(np.mean(np.abs(pinn_wss_mag - cfd_wss_mag))),
+            "wss_rmse": float(np.sqrt(np.mean((pinn_wss_mag - cfd_wss_mag) ** 2))),
+            "wss_r2": float(_r2(cfd_wss_mag, pinn_wss_mag)),
+            "wss_rel_error_pct": float(_rel_error_pct(cfd_wss_mag, pinn_wss_mag)),
+            "wss_correlation": float(np.corrcoef(cfd_wss_mag, pinn_wss_mag)[0, 1]),
+            # Per-component WSS (Pa)
+            "wss_x_mae": float(np.mean(np.abs(pinn_wss_x - cfd_wss_x))),
+            "wss_y_mae": float(np.mean(np.abs(pinn_wss_y - cfd_wss_y))),
+            "wss_z_mae": float(np.mean(np.abs(pinn_wss_z - cfd_wss_z))),
+            # Pressure (Pa)
+            "pressure_mae": float(np.mean(np.abs(pinn_pressure - cfd_pressure))),
+            "pressure_rmse": float(np.sqrt(np.mean((pinn_pressure - cfd_pressure) ** 2))),
+            "pressure_r2": float(_r2(cfd_pressure, pinn_pressure)),
+            "pressure_rel_error_pct": float(_rel_error_pct(cfd_pressure, pinn_pressure)),
+            "pressure_correlation": float(np.corrcoef(cfd_pressure.flatten(), pinn_pressure.flatten())[0, 1]),
+        }
+        results.append(row)
+        print(f"  {geom} {phase}: WSS MAE={row['wss_mae']:.4f} Pa, "
+              f"R²={row['wss_r2']:.4f}, Pressure R²={row['pressure_r2']:.4f}")
+
+    return results
+
+
 # ── Cross-geometry summary ────────────────────────────────────────────────
 
+def generate_full_metrics_summary(out_dir=None, device="cuda"):
+    """Recompute all metrics from checkpoints and produce the publication summary table.
+
+    Outputs:
+      - experiments/full_metrics.csv          (per-geometry, per-phase rows)
+      - experiments/summary_table.csv         (Mean ± Std across all configs)
+      - experiments/summary_bar_chart.png     (bar chart)
+    """
+    _apply_pub_style()
+    if out_dir is None:
+        out_dir = PROJECT_ROOT / "experiments"
+    out_dir = Path(out_dir)
+
+    all_rows = []
+    for geom in GEOM_INFO:
+        ckpt_path = out_dir / geom / "best_model.pt"
+        if not ckpt_path.exists():
+            print(f"  [SKIP] {geom}: no best_model.pt")
+            continue
+        print(f"\n=== {geom} ===")
+        rows = compute_metrics_from_checkpoint(geom, str(ckpt_path), device=device)
+        all_rows.extend(rows)
+
+    if not all_rows:
+        print("  No checkpoints found.")
+        return
+
+    df = pd.DataFrame(all_rows)
+    full_path = out_dir / "full_metrics.csv"
+    df.to_csv(full_path, index=False, float_format="%.6f")
+    print(f"\nPer-config metrics saved: {full_path}")
+
+    # ── Publication summary: Mean ± Std across all configs ──────────────
+    summary_cols = [
+        ("WSS", "wss_mae", "wss_rmse", "wss_r2", "wss_rel_error_pct"),
+        ("Pressure", "pressure_mae", "pressure_rmse", "pressure_r2", "pressure_rel_error_pct"),
+    ]
+
+    summary_rows = []
+    for label, mae_col, rmse_col, r2_col, rel_col in summary_cols:
+        summary_rows.append({
+            "Variable": label,
+            "MAE": f"{df[mae_col].mean():.4f} ± {df[mae_col].std():.4f}",
+            "RMSE": f"{df[rmse_col].mean():.4f} ± {df[rmse_col].std():.4f}",
+            "R²": f"{df[r2_col].mean():.2f} ± {df[r2_col].std():.2f}",
+            "Rel. Error (%)": f"{df[rel_col].mean():.1f} ± {df[rel_col].std():.1f}",
+        })
+
+    summary_df = pd.DataFrame(summary_rows)
+    summary_path = out_dir / "summary_table.csv"
+    summary_df.to_csv(summary_path, index=False)
+    print(f"Summary table saved: {summary_path}")
+    print("\n" + summary_df.to_string(index=False))
+
+    # ── Bar chart ──────────────────────────────────────────────────────────
+    geoms = df["geometry"].unique()
+    phases = df["phase"].unique()
+    x = np.arange(len(geoms))
+    width = 0.35
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
+
+    chart_specs = [
+        (axes[0, 0], "wss_r2",              r"$R^2$",              "(a) WSS $R^2$"),
+        (axes[0, 1], "wss_rel_error_pct",   "Rel. Error (%)",     "(b) WSS Rel. Error"),
+        (axes[1, 0], "pressure_r2",         r"$R^2$",              "(c) Pressure $R^2$"),
+        (axes[1, 1], "pressure_rel_error_pct", "Rel. Error (%)",  "(d) Pressure Rel. Error"),
+    ]
+
+    for ax, metric, ylabel, title in chart_specs:
+        for j, phase in enumerate(phases):
+            subset = df[df["phase"] == phase]
+            vals = [subset[subset["geometry"] == g][metric].values[0]
+                    if len(subset[subset["geometry"] == g]) > 0 else 0
+                    for g in geoms]
+            offset = (j - 0.5) * width
+            bars = ax.bar(x + offset, vals, width, label=phase.capitalize(), alpha=0.85)
+            for bar, v in zip(bars, vals):
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                        f"{v:.2f}", ha="center", va="bottom", fontsize=8)
+        ax.set_xticks(x)
+        ax.set_xticklabels(geoms)
+        ax.set_xlabel("Geometry")
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.legend()
+        ax.grid(True, alpha=0.2, axis="y")
+
+    fig.savefig(out_dir / "summary_bar_chart.png", dpi=300)
+    plt.close(fig)
+    print(f"Summary bar chart saved: {out_dir / 'summary_bar_chart.png'}")
+
+
 def generate_summary_table_and_charts(out_dir=None):
-    """Read all evaluation_metrics.csv files and produce a summary CSV + bar chart PNG."""
+    """Legacy wrapper: read existing CSVs and produce summary. Use --metrics for full recompute."""
     _apply_pub_style()
     if out_dir is None:
         out_dir = PROJECT_ROOT / "experiments"
@@ -518,7 +758,7 @@ def generate_summary_table_and_charts(out_dir=None):
             continue
         df = pd.read_csv(csv_path)
         for _, row in df.iterrows():
-            rows.append({
+            entry = {
                 "geometry": geom,
                 "phase": row["phase"],
                 "epoch": int(row["epoch"]),
@@ -533,7 +773,15 @@ def generate_summary_table_and_charts(out_dir=None):
                 "res_mom_y": row["residual_momentum_y"],
                 "res_mom_z": row["residual_momentum_z"],
                 "res_continuity": row["residual_continuity"],
-            })
+            }
+            if "wss_r2" in row:
+                entry["wss_r2"] = row["wss_r2"]
+            if "pressure_mae_pa" in row:
+                entry["pressure_mae"] = row["pressure_mae_pa"]
+                entry["pressure_rmse"] = row["pressure_rmse_pa"]
+                entry["pressure_r2"] = row["pressure_r2"]
+                entry["pressure_rel_error_pct"] = row["pressure_rel_error_pct"]
+            rows.append(entry)
 
     if not rows:
         print("  No evaluation metrics found.")
@@ -575,7 +823,6 @@ def generate_summary_table_and_charts(out_dir=None):
         ax.legend()
         ax.grid(True, alpha=0.2, axis="y")
 
-    # PNG only (no PDF)
     fig.savefig(out_dir / "summary_bar_chart.png", dpi=300)
     plt.close(fig)
     print(f"  Summary bar chart saved: {out_dir / 'summary_bar_chart.png'}")
@@ -784,6 +1031,8 @@ def main():
                         help="Generate publication-quality loss curve plots (PNG)")
     parser.add_argument("--summary", action="store_true",
                         help="Generate cross-geometry summary table and bar chart (PNG)")
+    parser.add_argument("--metrics", action="store_true",
+                        help="Recompute full metrics from checkpoints and generate summary table")
     args = parser.parse_args()
 
     geoms = []
@@ -791,6 +1040,10 @@ def main():
         geoms = list(GEOM_INFO.keys())
     elif args.geom:
         geoms = [args.geom.upper()]
+
+    if args.metrics:
+        print("\n=== Recomputing full metrics from checkpoints ===")
+        generate_full_metrics_summary(device=args.device)
 
     if args.summary:
         print("\n=== Generating cross-geometry summary ===")
@@ -802,11 +1055,11 @@ def main():
             print(f"\n=== Loss plots: {geom} ===")
             generate_publication_loss_plots(geom)
 
-    if geoms and not args.loss_plots and not args.summary:
+    if geoms and not args.loss_plots and not args.summary and not args.metrics:
         for geom in geoms:
             process_geometry(geom, args.checkpoint, args.device)
-    elif not geoms and not args.loss_plots and not args.summary:
-        parser.error("Specify --geom GEOM, --all, --loss-plots, or --summary")
+    elif not geoms and not args.loss_plots and not args.summary and not args.metrics:
+        parser.error("Specify --geom GEOM, --all, --loss-plots, --metrics, or --summary")
 
     print("\nDone!")
 

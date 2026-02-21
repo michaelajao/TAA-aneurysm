@@ -963,6 +963,48 @@ class TAATrainer:
         else:
             return self._train_epoch_adaptive()
 
+    def _compute_pressure_metrics(self, phase):
+        """Compute pressure MAE, RMSE, R² in physical Pa units."""
+        tensors = self.data[phase]
+        n = tensors['x'].shape[0]
+        batch = self.config['training'].get('wall_batch_size', 2000)
+
+        p_pred_list = []
+        for i in range(0, n, batch):
+            j = min(i + batch, n)
+            inp = torch.cat([tensors['x'][i:j], tensors['y'][i:j],
+                             tensors['z'][i:j], tensors['phase'][i:j]], dim=1)
+            with torch.no_grad():
+                p_pred_list.append(self.networks['p'](inp).view(-1))
+
+        p_pred_nd = torch.cat(p_pred_list)
+        p_true_nd = tensors['pressure'].view(-1)
+
+        P_ref = self.ref_scales['P_ref']
+        pressure_std = self.ref_scales.get('pressure_std', 1.0)
+        p_pred_pa = p_pred_nd * pressure_std * P_ref
+        p_true_pa = p_true_nd * pressure_std * P_ref
+
+        diff = p_pred_pa - p_true_pa
+        mae = torch.abs(diff).mean().item()
+        rmse = torch.sqrt((diff ** 2).mean()).item()
+
+        ss_res = (diff ** 2).sum()
+        ss_tot = ((p_true_pa - p_true_pa.mean()) ** 2).sum()
+        r2 = (1.0 - ss_res / (ss_tot + 1e-12)).item()
+
+        rel_err = (torch.norm(diff) / (torch.norm(p_true_pa) + 1e-12)).item() * 100.0
+
+        return {'pressure_mae': mae, 'pressure_rmse': rmse,
+                'pressure_r2': r2, 'pressure_rel_error_pct': rel_err}
+
+    @staticmethod
+    def _r2_from_tensors(pred, true):
+        """Coefficient of determination (R²) between two flat tensors."""
+        ss_res = ((true - pred) ** 2).sum()
+        ss_tot = ((true - true.mean()) ** 2).sum()
+        return (1.0 - ss_res / (ss_tot + 1e-12)).item()
+
     def evaluate(self):
         """Evaluate on training data and return detailed metrics per phase.
 
@@ -990,16 +1032,26 @@ class TAATrainer:
             print(f"    Inlet:    {loss_dict['inlet']:.6f}")
             print(f"    Outlet:   {loss_dict['outlet']:.6f}")
 
-            # Compute WSS metrics
+            # Compute WSS metrics (non-dimensional)
             tensors = self.data[phase]
             wss_true = torch.cat([tensors['wss_x'], tensors['wss_y'], tensors['wss_z']], dim=1)
             metrics = compute_wss_metrics(wss_pred, wss_true)
+            wss_r2 = self._r2_from_tensors(wss_pred.flatten(), wss_true.flatten())
 
             print(f"  WSS Metrics:")
             print(f"    Relative L2: {metrics['relative_l2']:.4f}")
             print(f"    Correlation: {metrics['correlation']:.4f}")
+            print(f"    R²:          {wss_r2:.4f}")
             print(f"    MAE:         {metrics['mae']:.6f}")
             print(f"    RMSE:        {metrics['rmse']:.6f}")
+
+            # Pressure metrics in physical Pa
+            p_metrics = self._compute_pressure_metrics(phase)
+            print(f"  Pressure Metrics (Pa):")
+            print(f"    MAE:         {p_metrics['pressure_mae']:.4f}")
+            print(f"    RMSE:        {p_metrics['pressure_rmse']:.4f}")
+            print(f"    R²:          {p_metrics['pressure_r2']:.4f}")
+            print(f"    Rel. Error:  {p_metrics['pressure_rel_error_pct']:.2f}%")
 
             print(f"  Physics Residuals:")
             print(f"    Momentum X: {loss_dict['residual_momentum_x']:.6f}")
@@ -1027,8 +1079,13 @@ class TAATrainer:
                 "loss_outlet": loss_dict['outlet'],
                 "wss_relative_l2": metrics['relative_l2'],
                 "wss_correlation": metrics['correlation'],
+                "wss_r2": wss_r2,
                 "wss_mae": metrics['mae'],
                 "wss_rmse": metrics['rmse'],
+                "pressure_mae_pa": p_metrics['pressure_mae'],
+                "pressure_rmse_pa": p_metrics['pressure_rmse'],
+                "pressure_r2": p_metrics['pressure_r2'],
+                "pressure_rel_error_pct": p_metrics['pressure_rel_error_pct'],
                 "residual_momentum_x": loss_dict['residual_momentum_x'],
                 "residual_momentum_y": loss_dict['residual_momentum_y'],
                 "residual_momentum_z": loss_dict['residual_momentum_z'],
