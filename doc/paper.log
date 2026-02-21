@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (MiKTeX 25.4) (preloaded format=pdflatex 2025.8.15)  21 FEB 2026 01:25
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (MiKTeX 25.4) (preloaded format=pdflatex 2025.8.15)  21 FEB 2026 01:52
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -746,69 +746,73 @@ Overfull \hbox (22.62473pt too wide) in paragraph at lines 641--642
 []\OT1/cmr/m/n/10.95 For qual-i-ta-tive as-sess-ment, we gen-er-ate spa-tial vi-su-al-i-sa-tions in-clud-ing three-panel comparisons---
  []
 
-<../experiments/AD5/loss_curves_2x1.png, id=387, 722.7pt x 722.7pt>
+<../experiments/AD5/loss_curves_2x1.png, id=381, 722.7pt x 722.7pt>
 File: ../experiments/AD5/loss_curves_2x1.png Graphic file (type png)
 <use ../experiments/AD5/loss_curves_2x1.png>
-Package pdftex.def Info: ../experiments/AD5/loss_curves_2x1.png  used on input line 653.
+Package pdftex.def Info: ../experiments/AD5/loss_curves_2x1.png  used on input line 657.
 (pdftex.def)             Requested size: 217.42265pt x 217.41818pt.
-<../experiments/AD6/loss_curves_2x1.png, id=389, 722.7pt x 722.7pt>
+<../experiments/AD6/loss_curves_2x1.png, id=383, 722.7pt x 722.7pt>
 File: ../experiments/AD6/loss_curves_2x1.png Graphic file (type png)
 <use ../experiments/AD6/loss_curves_2x1.png>
-Package pdftex.def Info: ../experiments/AD6/loss_curves_2x1.png  used on input line 660.
+Package pdftex.def Info: ../experiments/AD6/loss_curves_2x1.png  used on input line 664.
 (pdftex.def)             Requested size: 217.42265pt x 217.41818pt.
 
 
 [13]
+Overfull \hbox (17.75258pt too wide) in paragraph at lines 682--700
+ [][] 
+ []
+
+
 
 [14 <../experiments/AD5/loss_curves_2x1.png> <../experiments/AD6/loss_curves_2x1.png>]
-<../experiments/AD5/figures/AD5_systolic_WSS_magnitude_xy.png, id=405, 1445.4pt x 346.4142pt>
-File: ../experiments/AD5/figures/AD5_systolic_WSS_magnitude_xy.png Graphic file (type png)
-<use ../experiments/AD5/figures/AD5_systolic_WSS_magnitude_xy.png>
-Package pdftex.def Info: ../experiments/AD5/figures/AD5_systolic_WSS_magnitude_xy.png  used on input line 706.
-(pdftex.def)             Requested size: 452.9679pt x 108.56075pt.
-<../experiments/AD6/figures/AD6_systolic_WSS_magnitude_xy.png, id=406, 1445.4pt x 346.4142pt>
-File: ../experiments/AD6/figures/AD6_systolic_WSS_magnitude_xy.png Graphic file (type png)
-<use ../experiments/AD6/figures/AD6_systolic_WSS_magnitude_xy.png>
-Package pdftex.def Info: ../experiments/AD6/figures/AD6_systolic_WSS_magnitude_xy.png  used on input line 713.
-(pdftex.def)             Requested size: 452.9679pt x 108.56075pt.
-
 
 [15]
-<../experiments/AD5/figures/AD5_systolic_Pressure_xy.png, id=413, 1445.4pt x 346.4142pt>
+<../experiments/AD5/figures/AD5_systolic_WSS_magnitude_xy.png, id=406, 1445.4pt x 346.4142pt>
+File: ../experiments/AD5/figures/AD5_systolic_WSS_magnitude_xy.png Graphic file (type png)
+<use ../experiments/AD5/figures/AD5_systolic_WSS_magnitude_xy.png>
+Package pdftex.def Info: ../experiments/AD5/figures/AD5_systolic_WSS_magnitude_xy.png  used on input line 742.
+(pdftex.def)             Requested size: 452.9679pt x 108.56075pt.
+<../experiments/AD6/figures/AD6_systolic_WSS_magnitude_xy.png, id=407, 1445.4pt x 346.4142pt>
+File: ../experiments/AD6/figures/AD6_systolic_WSS_magnitude_xy.png Graphic file (type png)
+<use ../experiments/AD6/figures/AD6_systolic_WSS_magnitude_xy.png>
+Package pdftex.def Info: ../experiments/AD6/figures/AD6_systolic_WSS_magnitude_xy.png  used on input line 749.
+(pdftex.def)             Requested size: 452.9679pt x 108.56075pt.
+<../experiments/AD5/figures/AD5_systolic_Pressure_xy.png, id=409, 1445.4pt x 346.4142pt>
 File: ../experiments/AD5/figures/AD5_systolic_Pressure_xy.png Graphic file (type png)
 <use ../experiments/AD5/figures/AD5_systolic_Pressure_xy.png>
-Package pdftex.def Info: ../experiments/AD5/figures/AD5_systolic_Pressure_xy.png  used on input line 729.
+Package pdftex.def Info: ../experiments/AD5/figures/AD5_systolic_Pressure_xy.png  used on input line 765.
 (pdftex.def)             Requested size: 452.9679pt x 108.56075pt.
-<../experiments/AD6/figures/AD6_systolic_Pressure_xy.png, id=414, 1445.4pt x 346.4142pt>
+<../experiments/AD6/figures/AD6_systolic_Pressure_xy.png, id=410, 1445.4pt x 346.4142pt>
 File: ../experiments/AD6/figures/AD6_systolic_Pressure_xy.png Graphic file (type png)
 <use ../experiments/AD6/figures/AD6_systolic_Pressure_xy.png>
-Package pdftex.def Info: ../experiments/AD6/figures/AD6_systolic_Pressure_xy.png  used on input line 736.
+Package pdftex.def Info: ../experiments/AD6/figures/AD6_systolic_Pressure_xy.png  used on input line 772.
 (pdftex.def)             Requested size: 452.9679pt x 108.56075pt.
 
 
 [16 <../experiments/AD5/figures/AD5_systolic_WSS_magnitude_xy.png> <../experiments/AD6/figures/AD6_systolic_WSS_magnitude_xy.png>]
-<../experiments/AD5/figures/AD5_diastolic_WSS_magnitude_xy.png, id=424, 1445.4pt x 346.4142pt>
+<../experiments/AD5/figures/AD5_diastolic_WSS_magnitude_xy.png, id=421, 1445.4pt x 346.4142pt>
 File: ../experiments/AD5/figures/AD5_diastolic_WSS_magnitude_xy.png Graphic file (type png)
 <use ../experiments/AD5/figures/AD5_diastolic_WSS_magnitude_xy.png>
-Package pdftex.def Info: ../experiments/AD5/figures/AD5_diastolic_WSS_magnitude_xy.png  used on input line 752.
+Package pdftex.def Info: ../experiments/AD5/figures/AD5_diastolic_WSS_magnitude_xy.png  used on input line 788.
 (pdftex.def)             Requested size: 452.9679pt x 108.56075pt.
-<../experiments/AD6/figures/AD6_diastolic_WSS_magnitude_xy.png, id=425, 1445.4pt x 349.305pt>
+<../experiments/AD6/figures/AD6_diastolic_WSS_magnitude_xy.png, id=422, 1445.4pt x 349.305pt>
 File: ../experiments/AD6/figures/AD6_diastolic_WSS_magnitude_xy.png Graphic file (type png)
 <use ../experiments/AD6/figures/AD6_diastolic_WSS_magnitude_xy.png>
-Package pdftex.def Info: ../experiments/AD6/figures/AD6_diastolic_WSS_magnitude_xy.png  used on input line 759.
+Package pdftex.def Info: ../experiments/AD6/figures/AD6_diastolic_WSS_magnitude_xy.png  used on input line 795.
 (pdftex.def)             Requested size: 452.9679pt x 109.46667pt.
 
 
 [17 <../experiments/AD5/figures/AD5_systolic_Pressure_xy.png> <../experiments/AD6/figures/AD6_systolic_Pressure_xy.png>]
-<../experiments/AD5/figures/AD5_systolic_WSS_magnitude_3d.png, id=437, 2810.5pt x 1304.875pt>
+<../experiments/AD5/figures/AD5_systolic_WSS_magnitude_3d.png, id=434, 2810.5pt x 1304.875pt>
 File: ../experiments/AD5/figures/AD5_systolic_WSS_magnitude_3d.png Graphic file (type png)
 <use ../experiments/AD5/figures/AD5_systolic_WSS_magnitude_3d.png>
-Package pdftex.def Info: ../experiments/AD5/figures/AD5_systolic_WSS_magnitude_3d.png  used on input line 775.
+Package pdftex.def Info: ../experiments/AD5/figures/AD5_systolic_WSS_magnitude_3d.png  used on input line 811.
 (pdftex.def)             Requested size: 317.07614pt x 147.20027pt.
-<../experiments/AD6/figures/AD6_systolic_WSS_magnitude_3d.png, id=438, 2810.5pt x 1304.875pt>
+<../experiments/AD6/figures/AD6_systolic_WSS_magnitude_3d.png, id=435, 2810.5pt x 1304.875pt>
 File: ../experiments/AD6/figures/AD6_systolic_WSS_magnitude_3d.png Graphic file (type png)
 <use ../experiments/AD6/figures/AD6_systolic_WSS_magnitude_3d.png>
-Package pdftex.def Info: ../experiments/AD6/figures/AD6_systolic_WSS_magnitude_3d.png  used on input line 782.
+Package pdftex.def Info: ../experiments/AD6/figures/AD6_systolic_WSS_magnitude_3d.png  used on input line 818.
 (pdftex.def)             Requested size: 317.07614pt x 147.20027pt.
 
 
@@ -817,60 +821,58 @@ Package pdftex.def Info: ../experiments/AD6/figures/AD6_systolic_WSS_magnitude_3
 [19 <../experiments/AD5/figures/AD5_systolic_WSS_magnitude_3d.png> <../experiments/AD6/figures/AD6_systolic_WSS_magnitude_3d.png>]
 
 [20]
-<../experiments/AD5/loss_curves_adaptive_1x2.png, id=472, 1011.78pt x 361.35pt>
+<../experiments/AD5/loss_curves_adaptive_1x2.png, id=466, 1011.78pt x 361.35pt>
 File: ../experiments/AD5/loss_curves_adaptive_1x2.png Graphic file (type png)
 <use ../experiments/AD5/loss_curves_adaptive_1x2.png>
-Package pdftex.def Info: ../experiments/AD5/loss_curves_adaptive_1x2.png  used on input line 836.
+Package pdftex.def Info: ../experiments/AD5/loss_curves_adaptive_1x2.png  used on input line 860.
 (pdftex.def)             Requested size: 385.02547pt x 137.5074pt.
-<../experiments/AD6/loss_curves_adaptive_1x2.png, id=473, 1011.78pt x 361.35pt>
+<../experiments/AD6/loss_curves_adaptive_1x2.png, id=467, 1011.78pt x 361.35pt>
 File: ../experiments/AD6/loss_curves_adaptive_1x2.png Graphic file (type png)
 <use ../experiments/AD6/loss_curves_adaptive_1x2.png>
-Package pdftex.def Info: ../experiments/AD6/loss_curves_adaptive_1x2.png  used on input line 843.
+Package pdftex.def Info: ../experiments/AD6/loss_curves_adaptive_1x2.png  used on input line 867.
 (pdftex.def)             Requested size: 385.02547pt x 137.5074pt.
 
 
-[21]
+[21 <../experiments/AD5/loss_curves_adaptive_1x2.png> <../experiments/AD6/loss_curves_adaptive_1x2.png>]
 
-[22 <../experiments/AD5/loss_curves_adaptive_1x2.png> <../experiments/AD6/loss_curves_adaptive_1x2.png>]
-
-[23]
-Overfull \hbox (17.03099pt too wide) in paragraph at lines 883--884
+[22]
+Overfull \hbox (17.03099pt too wide) in paragraph at lines 905--906
 \OT1/cmr/m/n/10.95 em-bed-ded phys-i-cal laws, can re-cover the full vol-u-met-ric flow field within tho-racic aor-tic aneurysms---
  []
 
 
 
-[24]
+[23]
 
-[25]
-Underfull \hbox (badness 1466) in paragraph at lines 935--936
+[24]
+Underfull \hbox (badness 1466) in paragraph at lines 957--958
 \OT1/cmr/m/n/10.95 gies in physics-informed neu-ral net-works. \OT1/cmr/m/it/10.95 SIAM Jour-nal on Sci-en-tific Com-put-ing\OT1/cmr/m/n/10.95 .
  []
 
 
 
-[26]
+[25]
 
-[27] (paper.aux)
+[26] (paper.aux)
  ***********
 LaTeX2e <2025-06-01> patch level 1
 L3 programming layer <2025-07-20>
  ***********
 Package rerunfilecheck Info: File `paper.out' has not changed.
-(rerunfilecheck)             Checksum: 62A6A8DD9FDC7E09FBE283C708D95D41;10217.
+(rerunfilecheck)             Checksum: 6A7D837039C40DCE00DCAEE6F3E176CA;9858.
  ) 
 Here is how much of TeX's memory you used:
- 29080 strings out of 468134
- 605642 string characters out of 5430740
- 959752 words of memory out of 5000000
- 57125 multiletter control sequences out of 15000+600000
+ 29077 strings out of 468134
+ 605605 string characters out of 5430740
+ 958583 words of memory out of 5000000
+ 57124 multiletter control sequences out of 15000+600000
  644234 words of font info for 105 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 84i,12n,87p,1893b,1153s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 84i,12n,87p,1918b,1153s stack positions out of 10000i,1000n,20000p,200000b,200000s
  <C:\Users\ajaoo\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\tcrm1095.pk><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmbx10.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmbx12.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmbx8.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmex10.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi10.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi12.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi5.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi6.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi7.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi8.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi9.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmib10.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cmextra/cmmib8.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr10.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr6.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr7.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr8.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr9.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy10.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy8.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy9.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmti10.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmti12.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmtt10.pfb><C:/Users/ajaoo/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on paper.pdf (27 pages, 13382123 bytes).
+Output written on paper.pdf (26 pages, 13380807 bytes).
 PDF statistics:
- 666 PDF objects out of 1000 (max. 8388607)
- 143 named destinations out of 1000 (max. 500000)
- 505 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 655 PDF objects out of 1000 (max. 8388607)
+ 141 named destinations out of 1000 (max. 500000)
+ 489 words of extra memory for PDF output out of 10000 (max. 10000000)
 

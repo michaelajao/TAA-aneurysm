@@ -91,78 +91,76 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.2}CFD Ground Truth Data}{12}{subsection.4.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Dataset Composition}{12}{subsection.4.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Evaluation Metrics}{13}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Computational Environment}{13}{subsection.4.5}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {5}Results}{13}{section.5}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Training Convergence}{13}{subsection.5.1}\protected@file@percent }
 \newlabel{fig:training_ad5}{{5a}{14}{AD5 (5\,cm ASD)}{figure.caption.6}{}}
 \newlabel{sub@fig:training_ad5}{{a}{14}{AD5 (5\,cm ASD)}{figure.caption.6}{}}
 \newlabel{fig:training_ad6}{{5b}{14}{AD6 (6\,cm ASD)}{figure.caption.6}{}}
 \newlabel{sub@fig:training_ad6}{{b}{14}{AD6 (6\,cm ASD)}{figure.caption.6}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Training convergence for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Top row: total loss over epochs on a logarithmic scale. Bottom row: individual component losses (WSS, physics, no-slip BC, pressure, inlet BC, outlet BC). Both configurations exhibit rapid initial convergence within the first 500 epochs, followed by steady refinement. The physics loss decreases consistently throughout training, confirming enforcement of the RANS conservation laws.}}{14}{figure.caption.6}\protected@file@percent }
-\newlabel{fig:training}{{5}{14}{Training convergence for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Top row: total loss over epochs on a logarithmic scale. Bottom row: individual component losses (WSS, physics, no-slip BC, pressure, inlet BC, outlet BC). Both configurations exhibit rapid initial convergence within the first 500 epochs, followed by steady refinement. The physics loss decreases consistently throughout training, confirming enforcement of the RANS conservation laws}{figure.caption.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Training loss curves for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Top row: total loss on a logarithmic scale. Bottom row: individual component losses (WSS, physics, no-slip BC, pressure, inlet BC, outlet BC).}}{14}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:training}{{5}{14}{Training loss curves for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Top row: total loss on a logarithmic scale. Bottom row: individual component losses (WSS, physics, no-slip BC, pressure, inlet BC, outlet BC)}{figure.caption.6}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Quantitative Performance}{14}{subsection.5.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces WSS Prediction Metrics per Configuration and Cardiac Phase}}{15}{table.caption.7}\protected@file@percent }
-\newlabel{tab:performance}{{2}{15}{WSS Prediction Metrics per Configuration and Cardiac Phase}{table.caption.7}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Spatial Error Distributions}{15}{subsection.5.3}\protected@file@percent }
-\newlabel{fig:wss_xy_ad5}{{6a}{16}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.8}{}}
-\newlabel{sub@fig:wss_xy_ad5}{{a}{16}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.8}{}}
-\newlabel{fig:wss_xy_ad6}{{6b}{16}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.8}{}}
-\newlabel{sub@fig:wss_xy_ad6}{{b}{16}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.8}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Spatial distribution of WSS magnitude (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. The PINN reproduces elevated WSS concentrations near the aneurysm neck and low WSS within the recirculation zone. Errors remain predominantly below 0.5\,Pa for AD5 and below 0.25\,Pa for AD6, concentrated near geometric transitions and flow impingement sites.}}{16}{figure.caption.8}\protected@file@percent }
-\newlabel{fig:spatial_wss}{{6}{16}{Spatial distribution of WSS magnitude (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. The PINN reproduces elevated WSS concentrations near the aneurysm neck and low WSS within the recirculation zone. Errors remain predominantly below 0.5\,Pa for AD5 and below 0.25\,Pa for AD6, concentrated near geometric transitions and flow impingement sites}{figure.caption.8}{}}
-\newlabel{fig:pressure_xy_ad5}{{7a}{17}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.9}{}}
-\newlabel{sub@fig:pressure_xy_ad5}{{a}{17}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.9}{}}
-\newlabel{fig:pressure_xy_ad6}{{7b}{17}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.9}{}}
-\newlabel{sub@fig:pressure_xy_ad6}{{b}{17}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.9}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Spatial distribution of pressure (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. The PINN captures the pressure gradient from inlet to outlet across both geometries. Errors are distributed throughout the domain with peak values of approximately 14--16\,Pa, modest relative to the overall pressure range of $\sim $225\,Pa (AD5) and $\sim $200\,Pa (AD6).}}{17}{figure.caption.9}\protected@file@percent }
-\newlabel{fig:spatial_pressure}{{7}{17}{Spatial distribution of pressure (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. The PINN captures the pressure gradient from inlet to outlet across both geometries. Errors are distributed throughout the domain with peak values of approximately 14--16\,Pa, modest relative to the overall pressure range of $\sim $225\,Pa (AD5) and $\sim $200\,Pa (AD6)}{figure.caption.9}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Diastolic WSS Predictions}{17}{subsection.5.4}\protected@file@percent }
-\newlabel{fig:wss_diastolic_ad5}{{8a}{18}{AD5 (5\,cm ASD) --- diastolic phase}{figure.caption.10}{}}
-\newlabel{sub@fig:wss_diastolic_ad5}{{a}{18}{AD5 (5\,cm ASD) --- diastolic phase}{figure.caption.10}{}}
-\newlabel{fig:wss_diastolic_ad6}{{8b}{18}{AD6 (6\,cm ASD) --- diastolic phase}{figure.caption.10}{}}
-\newlabel{sub@fig:wss_diastolic_ad6}{{b}{18}{AD6 (6\,cm ASD) --- diastolic phase}{figure.caption.10}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Spatial distribution of WSS magnitude (XY plane, diastolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. Compared to the systolic phase (Figure~\ref {fig:spatial_wss}), WSS magnitudes are substantially reduced ($\sim $2.0\,Pa peak for AD5 and $\sim $1.2\,Pa for AD6 versus $\sim $6\,Pa during systole), with simpler spatial patterns. Prediction errors remain below 0.25\,Pa for AD5 and below 0.16\,Pa for AD6.}}{18}{figure.caption.10}\protected@file@percent }
-\newlabel{fig:wss_diastolic}{{8}{18}{Spatial distribution of WSS magnitude (XY plane, diastolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. Compared to the systolic phase (Figure~\ref {fig:spatial_wss}), WSS magnitudes are substantially reduced ($\sim $2.0\,Pa peak for AD5 and $\sim $1.2\,Pa for AD6 versus $\sim $6\,Pa during systole), with simpler spatial patterns. Prediction errors remain below 0.25\,Pa for AD5 and below 0.16\,Pa for AD6}{figure.caption.10}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Three-Dimensional WSS Visualisation}{18}{subsection.5.5}\protected@file@percent }
-\newlabel{fig:wss_3d_ad5}{{9a}{19}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.11}{}}
-\newlabel{sub@fig:wss_3d_ad5}{{a}{19}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.11}{}}
-\newlabel{fig:wss_3d_ad6}{{9b}{19}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.11}{}}
-\newlabel{sub@fig:wss_3d_ad6}{{b}{19}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.11}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Three-dimensional surface visualisation of WSS magnitude during the systolic phase for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows the CFD ground truth (left) alongside the PINN prediction (right). The PINN faithfully reproduces the spatial distribution of elevated WSS at the aneurysm neck and the low-WSS regions within the aneurysm sac, capturing the three-dimensional surface patterns relevant to clinical rupture risk assessment.}}{19}{figure.caption.11}\protected@file@percent }
-\newlabel{fig:wss_3d}{{9}{19}{Three-dimensional surface visualisation of WSS magnitude during the systolic phase for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows the CFD ground truth (left) alongside the PINN prediction (right). The PINN faithfully reproduces the spatial distribution of elevated WSS at the aneurysm neck and the low-WSS regions within the aneurysm sac, capturing the three-dimensional surface patterns relevant to clinical rupture risk assessment}{figure.caption.11}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Phase-Specific Analysis}{19}{subsection.5.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7}Computational Efficiency}{19}{subsection.5.7}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces WSS Prediction Metrics per Configuration and Cardiac Phase (full test dataset). PD6 results pending.}}{15}{table.caption.7}\protected@file@percent }
+\newlabel{tab:performance}{{2}{15}{WSS Prediction Metrics per Configuration and Cardiac Phase (full test dataset). PD6 results pending}{table.caption.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Pressure Prediction Accuracy}{15}{subsection.5.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Pressure Prediction Metrics per Configuration and Cardiac Phase (Pa). PD6 results pending.}}{15}{table.caption.8}\protected@file@percent }
+\newlabel{tab:pressure}{{3}{15}{Pressure Prediction Metrics per Configuration and Cardiac Phase (Pa). PD6 results pending}{table.caption.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Spatial Error Distributions}{16}{subsection.5.4}\protected@file@percent }
+\newlabel{fig:wss_xy_ad5}{{6a}{16}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.9}{}}
+\newlabel{sub@fig:wss_xy_ad5}{{a}{16}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.9}{}}
+\newlabel{fig:wss_xy_ad6}{{6b}{16}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.9}{}}
+\newlabel{sub@fig:wss_xy_ad6}{{b}{16}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Spatial distribution of WSS magnitude (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows CFD ground truth (left), PINN prediction (centre), and absolute error (right). The error colour scale is clipped at the 95th percentile.}}{16}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:spatial_wss}{{6}{16}{Spatial distribution of WSS magnitude (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows CFD ground truth (left), PINN prediction (centre), and absolute error (right). The error colour scale is clipped at the 95th percentile}{figure.caption.9}{}}
+\newlabel{fig:pressure_xy_ad5}{{7a}{17}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.10}{}}
+\newlabel{sub@fig:pressure_xy_ad5}{{a}{17}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.10}{}}
+\newlabel{fig:pressure_xy_ad6}{{7b}{17}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.10}{}}
+\newlabel{sub@fig:pressure_xy_ad6}{{b}{17}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.10}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Spatial distribution of pressure (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows CFD ground truth (left), PINN prediction (centre), and absolute error (right). The error colour scale is clipped at the 95th percentile.}}{17}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:spatial_pressure}{{7}{17}{Spatial distribution of pressure (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows CFD ground truth (left), PINN prediction (centre), and absolute error (right). The error colour scale is clipped at the 95th percentile}{figure.caption.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Diastolic WSS Predictions}{17}{subsection.5.5}\protected@file@percent }
+\newlabel{fig:wss_diastolic_ad5}{{8a}{18}{AD5 (5\,cm ASD) --- diastolic phase}{figure.caption.11}{}}
+\newlabel{sub@fig:wss_diastolic_ad5}{{a}{18}{AD5 (5\,cm ASD) --- diastolic phase}{figure.caption.11}{}}
+\newlabel{fig:wss_diastolic_ad6}{{8b}{18}{AD6 (6\,cm ASD) --- diastolic phase}{figure.caption.11}{}}
+\newlabel{sub@fig:wss_diastolic_ad6}{{b}{18}{AD6 (6\,cm ASD) --- diastolic phase}{figure.caption.11}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Spatial distribution of WSS magnitude (XY plane, diastolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows CFD ground truth (left), PINN prediction (centre), and absolute error (right). Compare with the systolic results in Figure~\ref {fig:spatial_wss}.}}{18}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:wss_diastolic}{{8}{18}{Spatial distribution of WSS magnitude (XY plane, diastolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows CFD ground truth (left), PINN prediction (centre), and absolute error (right). Compare with the systolic results in Figure~\ref {fig:spatial_wss}}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Three-Dimensional WSS Visualisation}{18}{subsection.5.6}\protected@file@percent }
 \citation{ref15}
+\newlabel{fig:wss_3d_ad5}{{9a}{19}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.12}{}}
+\newlabel{sub@fig:wss_3d_ad5}{{a}{19}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.12}{}}
+\newlabel{fig:wss_3d_ad6}{{9b}{19}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.12}{}}
+\newlabel{sub@fig:wss_3d_ad6}{{b}{19}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.12}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Three-dimensional surface distribution of WSS magnitude (systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows CFD ground truth (left) alongside the PINN prediction (right).}}{19}{figure.caption.12}\protected@file@percent }
+\newlabel{fig:wss_3d}{{9}{19}{Three-dimensional surface distribution of WSS magnitude (systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows CFD ground truth (left) alongside the PINN prediction (right)}{figure.caption.12}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion}{19}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Methodological Challenges: RANS Inference and Boundary Specification}{19}{subsection.6.1}\protected@file@percent }
 \citation{ref14}
 \citation{ref15}
 \citation{ref10}
-\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion}{20}{section.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}The Challenge of Learning RANS from Sparse Data}{20}{subsection.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Importance of Explicit Boundary Conditions}{20}{subsection.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Physics-Informed Learning Effectiveness}{20}{subsection.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Comparison with Existing Approaches}{20}{subsection.6.4}\protected@file@percent }
 \citation{ref_urrehman2025}
 \citation{ref_cruzgonzalez2025}
 \citation{ref_zhang2025}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}Adaptive Weighting Strategy}{21}{subsection.6.5}\protected@file@percent }
-\citation{ref18}
-\citation{ref3}
-\citation{ref8}
-\newlabel{fig:adaptive_ad5}{{10a}{22}{AD5 (5\,cm ASD)}{figure.caption.12}{}}
-\newlabel{sub@fig:adaptive_ad5}{{a}{22}{AD5 (5\,cm ASD)}{figure.caption.12}{}}
-\newlabel{fig:adaptive_ad6}{{10b}{22}{AD6 (6\,cm ASD)}{figure.caption.12}{}}
-\newlabel{sub@fig:adaptive_ad6}{{b}{22}{AD6 (6\,cm ASD)}{figure.caption.12}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Gradient-norm adaptive loss weighting dynamics for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Left panels: mean absolute gradient norms per loss component over training epochs. Right panels: corresponding adaptive weights computed via the EMA-smoothed rebalancing scheme. In both configurations, the physics loss gradient norm (orange) starts approximately two orders of magnitude above the WSS reference (blue) and is progressively down-weighted. The WSS weight remains anchored at 1.0 as the reference term.}}{22}{figure.caption.12}\protected@file@percent }
-\newlabel{fig:adaptive_weights}{{10}{22}{Gradient-norm adaptive loss weighting dynamics for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Left panels: mean absolute gradient norms per loss component over training epochs. Right panels: corresponding adaptive weights computed via the EMA-smoothed rebalancing scheme. In both configurations, the physics loss gradient norm (orange) starts approximately two orders of magnitude above the WSS reference (blue) and is progressively down-weighted. The WSS weight remains anchored at 1.0 as the reference term}{figure.caption.12}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.6}Non-Newtonian Viscosity Impact}{22}{subsection.6.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7}Multi-Configuration Generalisation}{22}{subsection.6.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Physics-Informed Learning Effectiveness}{20}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Comparison with Existing Approaches}{20}{subsection.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Adaptive Weighting Strategy}{21}{subsection.6.4}\protected@file@percent }
+\newlabel{fig:adaptive_ad5}{{10a}{21}{AD5 (5\,cm ASD)}{figure.caption.13}{}}
+\newlabel{sub@fig:adaptive_ad5}{{a}{21}{AD5 (5\,cm ASD)}{figure.caption.13}{}}
+\newlabel{fig:adaptive_ad6}{{10b}{21}{AD6 (6\,cm ASD)}{figure.caption.13}{}}
+\newlabel{sub@fig:adaptive_ad6}{{b}{21}{AD6 (6\,cm ASD)}{figure.caption.13}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Adaptive loss weighting dynamics for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Left panels: mean absolute gradient norms per loss component over training epochs. Right panels: corresponding adaptive weights from the EMA-smoothed rebalancing scheme.}}{21}{figure.caption.13}\protected@file@percent }
+\newlabel{fig:adaptive_weights}{{10}{21}{Adaptive loss weighting dynamics for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Left panels: mean absolute gradient norms per loss component over training epochs. Right panels: corresponding adaptive weights from the EMA-smoothed rebalancing scheme}{figure.caption.13}{}}
 \citation{ref19}
 \citation{ref20}
 \citation{ref_urrehman2025}
+\citation{ref18}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}Multi-Configuration Generalisation}{22}{subsection.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.6}Clinical Implications}{22}{subsection.6.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.7}Limitations and Future Work}{22}{subsection.6.7}\protected@file@percent }
 \citation{ref20}
 \citation{ref21}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.8}Clinical Implications}{23}{subsection.6.8}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.9}Limitations and Future Work}{23}{subsection.6.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{24}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{23}{section.7}\protected@file@percent }
 \bibcite{ref1}{1}
 \bibcite{ref2}{2}
 \bibcite{ref3}{3}
@@ -190,4 +188,4 @@
 \bibcite{ref_urrehman2025}{25}
 \bibcite{ref_cruzgonzalez2025}{26}
 \bibcite{ref_zhang2025}{27}
-\gdef \@abspage@last{27}
+\gdef \@abspage@last{26}
