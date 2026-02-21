@@ -22,6 +22,9 @@
 \citation{ref13}
 \citation{ref14}
 \citation{ref_wang2021}
+\citation{ref_urrehman2025}
+\citation{ref_cruzgonzalez2025}
+\citation{ref_zhang2025}
 \@writefile{toc}{\contentsline {section}{\numberline {2}Related Work}{3}{section.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}CFD in Aneurysm Hemodynamics}{3}{subsection.2.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Machine Learning for Hemodynamics}{3}{subsection.2.2}\protected@file@percent }
@@ -36,91 +39,130 @@
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.2}Non-Newtonian Molecular Viscosity (Carreau--Yasuda)}{4}{subsubsection.3.1.2}\protected@file@percent }
 \newlabel{sec:carreau}{{3.1.2}{4}{Non-Newtonian Molecular Viscosity (Carreau--Yasuda)}{subsubsection.3.1.2}{}}
 \newlabel{eq:carreau}{{4}{4}{Non-Newtonian Molecular Viscosity (Carreau--Yasuda)}{equation.4}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.3}Boundary Conditions}{4}{subsubsection.3.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.3}Boundary Conditions}{5}{subsubsection.3.1.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.4}Wall Shear Stress}{5}{subsubsection.3.1.4}\protected@file@percent }
 \newlabel{eq:wss}{{5}{5}{Wall Shear Stress}{equation.5}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Non-Dimensionalisation and Standardisation}{5}{subsection.3.2}\protected@file@percent }
 \newlabel{sec:nondim}{{3.2}{5}{Non-Dimensionalisation and Standardisation}{subsection.3.2}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.1}Reference Scales}{5}{subsubsection.3.2.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.2}Standardisation of Targets}{5}{subsubsection.3.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Network Architecture}{5}{subsection.3.3}\protected@file@percent }
-\newlabel{sec:arch}{{3.3}{5}{Network Architecture}{subsection.3.3}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.1}Input and Output}{5}{subsubsection.3.3.1}\protected@file@percent }
 \citation{ref_tancik2020}
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces High-level PINN architecture. A shared input $\mathbf  {z}$ is mapped through Fourier feature encoding and then fed into five independent networks. The three velocity outputs ($u$, $v$, $w$) are used to derive WSS via automatic differentiation of the stress tensor at the wall; WSS is not a separate network output. Data and boundary losses operate on wall predictions, while the physics loss enforces RANS residuals at interior collocation points using all five outputs.}}{6}{figure.caption.1}\protected@file@percent }
-\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
-\newlabel{fig:arch_overview}{{1}{6}{High-level PINN architecture. A shared input $\mathbf {z}$ is mapped through Fourier feature encoding and then fed into five independent networks. The three velocity outputs ($u$, $v$, $w$) are used to derive WSS via automatic differentiation of the stress tensor at the wall; WSS is not a separate network output. Data and boundary losses operate on wall predictions, while the physics loss enforces RANS residuals at interior collocation points using all five outputs}{figure.caption.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Network Architecture}{6}{subsection.3.3}\protected@file@percent }
+\newlabel{sec:arch}{{3.3}{6}{Network Architecture}{subsection.3.3}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.1}Input and Output}{6}{subsubsection.3.3.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.2}Fourier Feature Encoding}{6}{subsubsection.3.3.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.3.3}Residual MLP (Per Branch)}{6}{subsubsection.3.3.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Loss Function}{6}{subsection.3.4}\protected@file@percent }
-\newlabel{sec:loss}{{3.4}{6}{Loss Function}{subsection.3.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces High-level PINN architecture. A shared input $\mathbf  {z}$ is mapped through Fourier feature encoding and then fed into five independent networks. The three velocity outputs ($u$, $v$, $w$) are used to derive WSS via automatic differentiation of the stress tensor at the wall; WSS is not a separate network output. Data and boundary losses operate on wall predictions, while the physics loss enforces RANS residuals at interior collocation points using all five outputs.}}{7}{figure.caption.1}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:arch_overview}{{1}{7}{High-level PINN architecture. A shared input $\mathbf {z}$ is mapped through Fourier feature encoding and then fed into five independent networks. The three velocity outputs ($u$, $v$, $w$) are used to derive WSS via automatic differentiation of the stress tensor at the wall; WSS is not a separate network output. Data and boundary losses operate on wall predictions, while the physics loss enforces RANS residuals at interior collocation points using all five outputs}{figure.caption.1}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Single network branch laid out left to right: the 4D input $\mathbf  {z}$ is mapped through Fourier features ($\mathbb  {R}^{32}$), a linear encoder with Swish activation, a stack of $L$ residual blocks (all at hidden dimension $H$), and a linear decoder to one scalar. Each residual block applies $\mathbf  {h} + \mathbf  {W}_2\,\sigma (\mathbf  {W}_1\,\mathbf  {h})$ without an outer activation. Flow branches use $H=128$, $L=6$; the $\nu _t$ branch uses $H=64$, $L=4$ with a softplus output transform.}}{7}{figure.caption.2}\protected@file@percent }
 \newlabel{fig:arch_branch}{{2}{7}{Single network branch laid out left to right: the 4D input $\mathbf {z}$ is mapped through Fourier features ($\mathbb {R}^{32}$), a linear encoder with Swish activation, a stack of $L$ residual blocks (all at hidden dimension $H$), and a linear decoder to one scalar. Each residual block applies $\mathbf {h} + \mathbf {W}_2\,\sigma (\mathbf {W}_1\,\mathbf {h})$ without an outer activation. Flow branches use $H=128$, $L=6$; the $\nu _t$ branch uses $H=64$, $L=4$ with a softplus output transform}{figure.caption.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Loss Function}{7}{subsection.3.4}\protected@file@percent }
+\newlabel{sec:loss}{{3.4}{7}{Loss Function}{subsection.3.4}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.1}Data and Boundary Terms}{7}{subsubsection.3.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.2}Physics Loss}{7}{subsubsection.3.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}$\nu _t$ Lower-Bound Regularisation}{7}{subsubsection.3.4.3}\protected@file@percent }
+\citation{ref16}
+\citation{ref17}
 \citation{ref_wang2021}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.2}Physics Loss}{8}{subsubsection.3.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.3}$\nu _t$ Lower-Bound Regularisation}{8}{subsubsection.3.4.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.4}Total Loss}{8}{subsubsection.3.4.4}\protected@file@percent }
 \newlabel{eq:total_loss}{{11}{8}{Total Loss}{equation.11}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.4.5}Gradient-Norm Adaptive Loss Weighting}{8}{subsubsection.3.4.5}\protected@file@percent }
 \newlabel{sec:adaptive_weights}{{3.4.5}{8}{Gradient-Norm Adaptive Loss Weighting}{subsubsection.3.4.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Training Procedure}{8}{subsection.3.5}\protected@file@percent }
-\newlabel{sec:training}{{3.5}{8}{Training Procedure}{subsection.3.5}{}}
-\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.1}Alternating Dual-Optimiser Strategy}{8}{subsubsection.3.5.1}\protected@file@percent }
 \@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Gradient-Norm Adaptive Loss Weighting}}{9}{algorithm.1}\protected@file@percent }
 \newlabel{alg:adaptive_weights}{{1}{9}{Gradient-Norm Adaptive Loss Weighting}{algorithm.1}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Loss composition and dual-optimiser routing. Data terms (WSS, pressure) and boundary terms (no-slip, inlet, outlet) are combined with the physics residual and $\nu _t$ regularisation via adaptive weights. All terms flow to the flow optimiser that updates $u,v,w,p$; only the physics loss and $\nu _t$ regularisation update the turbulent viscosity network.}}{9}{figure.caption.3}\protected@file@percent }
-\newlabel{fig:loss_schematic}{{3}{9}{Loss composition and dual-optimiser routing. Data terms (WSS, pressure) and boundary terms (no-slip, inlet, outlet) are combined with the physics residual and $\nu _t$ regularisation via adaptive weights. All terms flow to the flow optimiser that updates $u,v,w,p$; only the physics loss and $\nu _t$ regularisation update the turbulent viscosity network}{figure.caption.3}{}}
-\@writefile{loa}{\contentsline {algorithm}{\numberline {2}{\ignorespaces Per-Epoch Training Loop with Alternating Dual-Optimiser}}{10}{algorithm.2}\protected@file@percent }
-\newlabel{alg:training}{{2}{10}{Per-Epoch Training Loop with Alternating Dual-Optimiser}{algorithm.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Training Procedure}{9}{subsection.3.5}\protected@file@percent }
+\newlabel{sec:training}{{3.5}{9}{Training Procedure}{subsection.3.5}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.1}Alternating Dual-Optimiser Strategy}{9}{subsubsection.3.5.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Loss composition and dual-optimiser routing. Data terms (WSS, pressure) and boundary terms (no-slip, inlet, outlet) are combined with the physics residual and $\nu _t$ regularisation via adaptive weights. All terms flow to the flow optimiser that updates $u,v,w,p$; only the physics loss and $\nu _t$ regularisation update the turbulent viscosity network.}}{10}{figure.caption.3}\protected@file@percent }
+\newlabel{fig:loss_schematic}{{3}{10}{Loss composition and dual-optimiser routing. Data terms (WSS, pressure) and boundary terms (no-slip, inlet, outlet) are combined with the physics residual and $\nu _t$ regularisation via adaptive weights. All terms flow to the flow optimiser that updates $u,v,w,p$; only the physics loss and $\nu _t$ regularisation update the turbulent viscosity network}{figure.caption.3}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.2}Optimiser Hyperparameters}{10}{subsubsection.3.5.2}\protected@file@percent }
 \newlabel{eq:cosine}{{14}{10}{Optimiser Hyperparameters}{equation.14}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.3}Wall Data and Interior Collocation}{10}{subsubsection.3.5.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Interior collocation point generation. Wall surface points (blue) are displaced inward along estimated normals (red arrows) by a random offset in $[0.05, 0.5]$ (normalised coordinates), producing collocation points (red dots) concentrated in the near-wall boundary layer where velocity gradients are steepest.}}{11}{figure.caption.4}\protected@file@percent }
-\newlabel{fig:collocation}{{4}{11}{Interior collocation point generation. Wall surface points (blue) are displaced inward along estimated normals (red arrows) by a random offset in $[0.05, 0.5]$ (normalised coordinates), producing collocation points (red dots) concentrated in the near-wall boundary layer where velocity gradients are steepest}{figure.caption.4}{}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {2}{\ignorespaces Per-Epoch Training Loop with Alternating Dual-Optimiser}}{11}{algorithm.2}\protected@file@percent }
+\newlabel{alg:training}{{2}{11}{Per-Epoch Training Loop with Alternating Dual-Optimiser}{algorithm.2}{}}
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.5.4}Early Stopping and Checkpointing}{11}{subsubsection.3.5.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {4}Experimental Setup}{11}{section.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Aneurysm Configurations}{11}{subsection.4.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Thoracic Aortic Aneurysm Configurations}}{11}{table.caption.5}\protected@file@percent }
-\newlabel{tab:configurations}{{1}{11}{Thoracic Aortic Aneurysm Configurations}{table.caption.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Interior collocation point generation. Wall surface points (blue) are displaced inward along estimated normals (red arrows) by a random offset in $[0.05, 0.5]$ (normalised coordinates), producing collocation points (red dots) concentrated in the near-wall boundary layer where velocity gradients are steepest.}}{12}{figure.caption.4}\protected@file@percent }
+\newlabel{fig:collocation}{{4}{12}{Interior collocation point generation. Wall surface points (blue) are displaced inward along estimated normals (red arrows) by a random offset in $[0.05, 0.5]$ (normalised coordinates), producing collocation points (red dots) concentrated in the near-wall boundary layer where velocity gradients are steepest}{figure.caption.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Thoracic Aortic Aneurysm Configurations}}{12}{table.caption.5}\protected@file@percent }
+\newlabel{tab:configurations}{{1}{12}{Thoracic Aortic Aneurysm Configurations}{table.caption.5}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.2}CFD Ground Truth Data}{12}{subsection.4.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Dataset Composition}{12}{subsection.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Evaluation Metrics}{12}{subsection.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5}Results}{12}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Training Convergence}{12}{subsection.5.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Training history: total loss, component losses (WSS, physics, BC, pressure), and learning rate over epochs. \textbf  {Replace placeholder with actual figure when available.}}}{13}{figure.caption.6}\protected@file@percent }
-\newlabel{fig:training}{{5}{13}{Training history: total loss, component losses (WSS, physics, BC, pressure), and learning rate over epochs. \textbf {Replace placeholder with actual figure when available.}}{figure.caption.6}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Quantitative Performance}{13}{subsection.5.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Quantitative Performance Metrics (Mean $\pm $ Std across all configurations)}}{13}{table.caption.7}\protected@file@percent }
-\newlabel{tab:performance}{{2}{13}{Quantitative Performance Metrics (Mean $\pm $ Std across all configurations)}{table.caption.7}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Spatial Error Distributions}{14}{subsection.5.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Spatial plane view (XY) of WSS: CFD ground truth, PINN prediction, and absolute error. \textbf  {Replace placeholder with actual figure when available.}}}{14}{figure.caption.8}\protected@file@percent }
-\newlabel{fig:spatial_wss}{{6}{14}{Spatial plane view (XY) of WSS: CFD ground truth, PINN prediction, and absolute error. \textbf {Replace placeholder with actual figure when available.}}{figure.caption.8}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Spatial plane view (XY) of pressure: CFD, PINN, and absolute error. \textbf  {Replace placeholder with actual figure when available.}}}{14}{figure.caption.9}\protected@file@percent }
-\newlabel{fig:spatial_pressure}{{7}{14}{Spatial plane view (XY) of pressure: CFD, PINN, and absolute error. \textbf {Replace placeholder with actual figure when available.}}{figure.caption.9}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Velocity Field Predictions}{14}{subsection.5.4}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Velocity field comparison (systolic, XY plane): CFD, PINN, and error. \textbf  {Replace placeholder with actual figure when available.}}}{15}{figure.caption.10}\protected@file@percent }
-\newlabel{fig:velocity}{{8}{15}{Velocity field comparison (systolic, XY plane): CFD, PINN, and error. \textbf {Replace placeholder with actual figure when available.}}{figure.caption.10}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Centerline Profiles}{15}{subsection.5.5}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Centerline profiles: CFD vs PINN for velocity, pressure, and WSS along the flow axis. \textbf  {Replace placeholder with actual figure when available.}}}{15}{figure.caption.11}\protected@file@percent }
-\newlabel{fig:centerline}{{9}{15}{Centerline profiles: CFD vs PINN for velocity, pressure, and WSS along the flow axis. \textbf {Replace placeholder with actual figure when available.}}{figure.caption.11}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Phase-Specific Analysis}{15}{subsection.5.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.7}Computational Efficiency}{15}{subsection.5.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Evaluation Metrics}{13}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Results}{13}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Training Convergence}{13}{subsection.5.1}\protected@file@percent }
+\newlabel{fig:training_ad5}{{5a}{14}{AD5 (5\,cm ASD)}{figure.caption.6}{}}
+\newlabel{sub@fig:training_ad5}{{a}{14}{AD5 (5\,cm ASD)}{figure.caption.6}{}}
+\newlabel{fig:training_ad6}{{5b}{14}{AD6 (6\,cm ASD)}{figure.caption.6}{}}
+\newlabel{sub@fig:training_ad6}{{b}{14}{AD6 (6\,cm ASD)}{figure.caption.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Training convergence for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Top row: total loss over epochs on a logarithmic scale. Bottom row: individual component losses (WSS, physics, no-slip BC, pressure, inlet BC, outlet BC). Both configurations exhibit rapid initial convergence within the first 500 epochs, followed by steady refinement. The physics loss decreases consistently throughout training, confirming enforcement of the RANS conservation laws.}}{14}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:training}{{5}{14}{Training convergence for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Top row: total loss over epochs on a logarithmic scale. Bottom row: individual component losses (WSS, physics, no-slip BC, pressure, inlet BC, outlet BC). Both configurations exhibit rapid initial convergence within the first 500 epochs, followed by steady refinement. The physics loss decreases consistently throughout training, confirming enforcement of the RANS conservation laws}{figure.caption.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Quantitative Performance}{14}{subsection.5.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces WSS Prediction Metrics per Configuration and Cardiac Phase}}{15}{table.caption.7}\protected@file@percent }
+\newlabel{tab:performance}{{2}{15}{WSS Prediction Metrics per Configuration and Cardiac Phase}{table.caption.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Spatial Error Distributions}{15}{subsection.5.3}\protected@file@percent }
+\newlabel{fig:wss_xy_ad5}{{6a}{16}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.8}{}}
+\newlabel{sub@fig:wss_xy_ad5}{{a}{16}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.8}{}}
+\newlabel{fig:wss_xy_ad6}{{6b}{16}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.8}{}}
+\newlabel{sub@fig:wss_xy_ad6}{{b}{16}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Spatial distribution of WSS magnitude (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. The PINN reproduces elevated WSS concentrations near the aneurysm neck and low WSS within the recirculation zone. Errors remain predominantly below 0.5\,Pa for AD5 and below 0.25\,Pa for AD6, concentrated near geometric transitions and flow impingement sites.}}{16}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:spatial_wss}{{6}{16}{Spatial distribution of WSS magnitude (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. The PINN reproduces elevated WSS concentrations near the aneurysm neck and low WSS within the recirculation zone. Errors remain predominantly below 0.5\,Pa for AD5 and below 0.25\,Pa for AD6, concentrated near geometric transitions and flow impingement sites}{figure.caption.8}{}}
+\newlabel{fig:pressure_xy_ad5}{{7a}{17}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.9}{}}
+\newlabel{sub@fig:pressure_xy_ad5}{{a}{17}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.9}{}}
+\newlabel{fig:pressure_xy_ad6}{{7b}{17}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.9}{}}
+\newlabel{sub@fig:pressure_xy_ad6}{{b}{17}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Spatial distribution of pressure (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. The PINN captures the pressure gradient from inlet to outlet across both geometries. Errors are distributed throughout the domain with peak values of approximately 14--16\,Pa, modest relative to the overall pressure range of $\sim $225\,Pa (AD5) and $\sim $200\,Pa (AD6).}}{17}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:spatial_pressure}{{7}{17}{Spatial distribution of pressure (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. The PINN captures the pressure gradient from inlet to outlet across both geometries. Errors are distributed throughout the domain with peak values of approximately 14--16\,Pa, modest relative to the overall pressure range of $\sim $225\,Pa (AD5) and $\sim $200\,Pa (AD6)}{figure.caption.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Diastolic WSS Predictions}{17}{subsection.5.4}\protected@file@percent }
+\newlabel{fig:wss_diastolic_ad5}{{8a}{18}{AD5 (5\,cm ASD) --- diastolic phase}{figure.caption.10}{}}
+\newlabel{sub@fig:wss_diastolic_ad5}{{a}{18}{AD5 (5\,cm ASD) --- diastolic phase}{figure.caption.10}{}}
+\newlabel{fig:wss_diastolic_ad6}{{8b}{18}{AD6 (6\,cm ASD) --- diastolic phase}{figure.caption.10}{}}
+\newlabel{sub@fig:wss_diastolic_ad6}{{b}{18}{AD6 (6\,cm ASD) --- diastolic phase}{figure.caption.10}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Spatial distribution of WSS magnitude (XY plane, diastolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. Compared to the systolic phase (Figure~\ref {fig:spatial_wss}), WSS magnitudes are substantially reduced ($\sim $2.0\,Pa peak for AD5 and $\sim $1.2\,Pa for AD6 versus $\sim $6\,Pa during systole), with simpler spatial patterns. Prediction errors remain below 0.25\,Pa for AD5 and below 0.16\,Pa for AD6.}}{18}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:wss_diastolic}{{8}{18}{Spatial distribution of WSS magnitude (XY plane, diastolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. Compared to the systolic phase (Figure~\ref {fig:spatial_wss}), WSS magnitudes are substantially reduced ($\sim $2.0\,Pa peak for AD5 and $\sim $1.2\,Pa for AD6 versus $\sim $6\,Pa during systole), with simpler spatial patterns. Prediction errors remain below 0.25\,Pa for AD5 and below 0.16\,Pa for AD6}{figure.caption.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Three-Dimensional WSS Visualisation}{18}{subsection.5.5}\protected@file@percent }
+\newlabel{fig:wss_3d_ad5}{{9a}{19}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.11}{}}
+\newlabel{sub@fig:wss_3d_ad5}{{a}{19}{AD5 (5\,cm ASD) --- systolic phase}{figure.caption.11}{}}
+\newlabel{fig:wss_3d_ad6}{{9b}{19}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.11}{}}
+\newlabel{sub@fig:wss_3d_ad6}{{b}{19}{AD6 (6\,cm ASD) --- systolic phase}{figure.caption.11}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Three-dimensional surface visualisation of WSS magnitude during the systolic phase for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows the CFD ground truth (left) alongside the PINN prediction (right). The PINN faithfully reproduces the spatial distribution of elevated WSS at the aneurysm neck and the low-WSS regions within the aneurysm sac, capturing the three-dimensional surface patterns relevant to clinical rupture risk assessment.}}{19}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:wss_3d}{{9}{19}{Three-dimensional surface visualisation of WSS magnitude during the systolic phase for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows the CFD ground truth (left) alongside the PINN prediction (right). The PINN faithfully reproduces the spatial distribution of elevated WSS at the aneurysm neck and the low-WSS regions within the aneurysm sac, capturing the three-dimensional surface patterns relevant to clinical rupture risk assessment}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Phase-Specific Analysis}{19}{subsection.5.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7}Computational Efficiency}{19}{subsection.5.7}\protected@file@percent }
 \citation{ref15}
-\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion}{16}{section.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}The Challenge of Learning RANS from Sparse Data}{16}{subsection.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Importance of Explicit Boundary Conditions}{16}{subsection.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Physics-Informed Learning Effectiveness}{16}{subsection.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Adaptive Weighting Strategy}{16}{subsection.6.4}\protected@file@percent }
+\citation{ref14}
+\citation{ref15}
+\citation{ref10}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion}{20}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}The Challenge of Learning RANS from Sparse Data}{20}{subsection.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Importance of Explicit Boundary Conditions}{20}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Physics-Informed Learning Effectiveness}{20}{subsection.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Comparison with Existing Approaches}{20}{subsection.6.4}\protected@file@percent }
+\citation{ref_urrehman2025}
+\citation{ref_cruzgonzalez2025}
+\citation{ref_zhang2025}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}Adaptive Weighting Strategy}{21}{subsection.6.5}\protected@file@percent }
 \citation{ref18}
+\citation{ref3}
+\citation{ref8}
+\newlabel{fig:adaptive_ad5}{{10a}{22}{AD5 (5\,cm ASD)}{figure.caption.12}{}}
+\newlabel{sub@fig:adaptive_ad5}{{a}{22}{AD5 (5\,cm ASD)}{figure.caption.12}{}}
+\newlabel{fig:adaptive_ad6}{{10b}{22}{AD6 (6\,cm ASD)}{figure.caption.12}{}}
+\newlabel{sub@fig:adaptive_ad6}{{b}{22}{AD6 (6\,cm ASD)}{figure.caption.12}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Gradient-norm adaptive loss weighting dynamics for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Left panels: mean absolute gradient norms per loss component over training epochs. Right panels: corresponding adaptive weights computed via the EMA-smoothed rebalancing scheme. In both configurations, the physics loss gradient norm (orange) starts approximately two orders of magnitude above the WSS reference (blue) and is progressively down-weighted. The WSS weight remains anchored at 1.0 as the reference term.}}{22}{figure.caption.12}\protected@file@percent }
+\newlabel{fig:adaptive_weights}{{10}{22}{Gradient-norm adaptive loss weighting dynamics for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Left panels: mean absolute gradient norms per loss component over training epochs. Right panels: corresponding adaptive weights computed via the EMA-smoothed rebalancing scheme. In both configurations, the physics loss gradient norm (orange) starts approximately two orders of magnitude above the WSS reference (blue) and is progressively down-weighted. The WSS weight remains anchored at 1.0 as the reference term}{figure.caption.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.6}Non-Newtonian Viscosity Impact}{22}{subsection.6.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.7}Multi-Configuration Generalisation}{22}{subsection.6.7}\protected@file@percent }
 \citation{ref19}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}Non-Newtonian Viscosity Impact}{17}{subsection.6.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.6}Multi-Configuration Generalisation}{17}{subsection.6.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7}Clinical Implications}{17}{subsection.6.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.8}Limitations and Future Work}{17}{subsection.6.8}\protected@file@percent }
+\citation{ref20}
+\citation{ref_urrehman2025}
 \citation{ref20}
 \citation{ref21}
-\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{18}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8}Clinical Implications}{23}{subsection.6.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.9}Limitations and Future Work}{23}{subsection.6.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{24}{section.7}\protected@file@percent }
 \bibcite{ref1}{1}
 \bibcite{ref2}{2}
 \bibcite{ref3}{3}
@@ -145,4 +187,7 @@
 \bibcite{ref20}{22}
 \bibcite{ref21}{23}
 \bibcite{raissi2019pinns}{24}
-\gdef \@abspage@last{20}
+\bibcite{ref_urrehman2025}{25}
+\bibcite{ref_cruzgonzalez2025}{26}
+\bibcite{ref_zhang2025}{27}
+\gdef \@abspage@last{27}

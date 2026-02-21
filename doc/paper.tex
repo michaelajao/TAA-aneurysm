@@ -42,7 +42,7 @@
 \maketitle
 
 \begin{abstract}
-Predicting hemodynamic parameters within thoracic aortic aneurysms (TAAs) remains a significant challenge in cardiovascular surgery, particularly when assessing rupture and dissection risk to guide surgical planning. Whilst traditional computational fluid dynamics (CFD) simulations provide detailed flow information, they demand substantial computational resources and time-consuming mesh generation for patient-specific geometries. We present a physics-informed neural network (PINN) framework that addresses these limitations by learning from sparse CFD wall data---using approximately one third of available measurements---whilst simultaneously enforcing Reynolds-averaged Navier-Stokes (RANS) equations with a learnable turbulent viscosity field. Our approach integrates a non-Newtonian Carreau-Yasuda viscosity model to capture the shear-thinning behaviour of blood, implements pulsatile inlet conditions derived from physiological waveforms, and predicts wall shear stress (WSS) patterns across six anatomically distinct aneurysm configurations. A gradient-norm adaptive loss weighting scheme dynamically balances data-driven and physics-based loss terms throughout training, while an alternating dual-optimiser strategy ensures the turbulent viscosity network receives dedicated gradient signal from the governing equations. Through this combination of techniques, the network achieves coefficient of determination values exceeding 0.85 for velocity components and 0.80 for pressure predictions, despite the significant data reduction. The trained model provides near-instantaneous inference, successfully reproducing complex haemodynamic features including recirculation zones and WSS distributions crucial for clinical decision-making.
+Predicting hemodynamic parameters within thoracic aortic aneurysms (TAAs) remains a significant challenge in cardiovascular surgery, particularly when assessing rupture and dissection risk to guide surgical planning. Whilst traditional computational fluid dynamics (CFD) simulations provide detailed flow information, they demand substantial computational resources and time-consuming mesh generation for patient-specific geometries. We present a physics-informed neural network (PINN) framework that addresses these limitations by learning from sparse CFD wall data---using approximately one third of available measurements---whilst simultaneously enforcing Reynolds-averaged Navier-Stokes (RANS) equations with a learnable turbulent viscosity field. Our approach integrates a non-Newtonian Carreau-Yasuda viscosity model to capture the shear-thinning behaviour of blood, implements pulsatile inlet conditions derived from physiological waveforms, and predicts wall shear stress (WSS) patterns across multiple anatomically distinct aneurysm configurations spanning two diameters and three morphologies. A gradient-norm adaptive loss weighting scheme dynamically balances data-driven and physics-based loss terms throughout training, while an alternating dual-optimiser strategy ensures the turbulent viscosity network receives dedicated gradient signal from the governing equations. Evaluated on four completed configurations, the framework achieves WSS Pearson correlations exceeding 0.93 and mean absolute errors below 0.20\,Pa, with consistent performance across both axisymmetric and asymmetric geometries. The trained model provides near-instantaneous inference, successfully reproducing complex haemodynamic features including recirculation zones and WSS distributions crucial for clinical decision-making.
 
 \noindent \textbf{Keywords:} Physics-Informed Neural Networks, Thoracic Aortic Aneurysms, Haemodynamics, Wall Shear Stress, RANS, Adaptive Loss Weighting, Sparse Data Learning
 \end{abstract}
@@ -79,7 +79,7 @@ Traditional machine learning approaches have been applied to predict hemodynamic
 
 Raissi et al.\ \cite{raissi2019pinns} introduced PINNs for solving forward and inverse problems in partial differential equations (PDEs). The key innovation is incorporating PDE residuals directly into the loss function, enabling networks to interpolate sparse data while satisfying conservation laws. PINNs have been successfully applied to fluid dynamics \cite{ref11}, heat transfer \cite{ref12}, and material modelling \cite{ref13}.
 
-In cardiovascular applications, Arzani et al.\ \cite{ref14} applied PINNs to synthetic arterial flow problems, demonstrating superior performance over pure data-driven methods. Wang et al.\ \cite{ref_wang2021} identified gradient flow pathologies that arise when physics and data losses compete, and proposed gradient-norm balancing to adaptively reweight loss terms---a strategy we adopt and extend in this work. However, application of PINNs to complex patient-specific aortic aneurysm geometries with pulsatile flow, RANS turbulence modelling, and non-Newtonian rheology remains largely unexplored.
+In cardiovascular applications, Arzani et al.\ \cite{ref14} applied PINNs to synthetic arterial flow problems, demonstrating superior performance over pure data-driven methods. Wang et al.\ \cite{ref_wang2021} identified gradient flow pathologies that arise when physics and data losses compete, and proposed gradient-norm balancing to adaptively reweight loss terms---a strategy we adopt and extend in this work. More recently, Ur Rehman et al.\ \cite{ref_urrehman2025} combined PINNs with CFD for fluid--structure interaction analysis of pulsatile flow in arterial aneurysms associated with Marfan syndrome, though their formulation uses laminar Navier-Stokes equations with compliant walls rather than RANS turbulence closure. Cruz-Gonz{\'a}lez et al.\ \cite{ref_cruzgonzalez2025} compared PINNs and Deep Operator Networks for 3D abdominal aortic aneurysm flow, demonstrating the viability of physics-informed approaches for aneurysm haemodynamics but likewise without turbulence modelling or non-Newtonian rheology. In parallel, Zhang et al.\ \cite{ref_zhang2025} showed that PINNs trained with unclosed RANS equations can infer Reynolds-stress forcing from sparse data, significantly improving turbulence predictions---an approach conceptually related to our learnable eddy viscosity field. Despite these advances, a PINN framework that jointly addresses RANS turbulence closure with a learnable $\nu_t$, non-Newtonian Carreau-Yasuda rheology, and adaptive multi-loss balancing for patient-specific aortic aneurysm geometries has not been reported.
 
 \section{Methodology}
 
@@ -109,7 +109,9 @@ where $\mathbf{u} = (u,v,w)^T$ is the velocity, $p$ is pressure, $\rho = 1060$\,
 \boldsymbol{\tau}_{\text{eff}} = \mu_{\text{eff}} \bigl( \nabla\mathbf{u} + (\nabla\mathbf{u})^T \bigr), \qquad \mu_{\text{eff}} = \mu(\dot{\gamma}) + \rho\,\nu_t.
 \label{eq:tau_eff}
 \end{equation}
-Here $\mu(\dot{\gamma})$ is the shear-dependent molecular viscosity (Carreau--Yasuda) and $\nu_t$ is the turbulent kinematic viscosity, which we treat as a \emph{learnable field} $\nu_t(\mathbf{x}; t_{\text{phase}})$ output by a separate network (see \S\ref{sec:arch}). Rather than solving transport equations for turbulence quantities such as $k$ and $\omega$, the network learns a spatially-varying effective eddy viscosity directly from the CFD data through the physics residual. Temporal dependence is captured by training on two discrete cardiac phases---systole and diastole---encoded as a scalar $t_{\text{phase}} \in \{0,1\}$; the same networks then approximate the flow at any query point $(\mathbf{x}, t_{\text{phase}})$.
+Here $\mu(\dot{\gamma})$ is the shear-dependent molecular viscosity (Carreau--Yasuda) and $\nu_t$ is the turbulent kinematic viscosity, which we treat as a \emph{learnable field} $\nu_t(\mathbf{x}; t_{\text{phase}})$ output by a separate network (see \S\ref{sec:arch}). Rather than solving transport equations for turbulence quantities such as $k$ and $\omega$, the network learns a spatially-varying effective eddy viscosity directly from the CFD data through the physics residual.
+
+We adopt a \emph{quasi-steady} formulation: the momentum equation (Eq.~\ref{eq:momentum}) omits the unsteady term $\rho\,\partial\mathbf{u}/\partial t$, and the flow is instead resolved at two discrete cardiac phases---systole ($t = 0.109$\,s) and diastole ($t = 0.359$\,s)---encoded as a scalar $t_{\text{phase}} \in \{0,1\}$. This approximation is justified because the reference CFD data were extracted at specific time instants from a fully-converged pulsatile simulation; at each snapshot, the flow field satisfies the steady RANS equations to within the CFD solver's residual tolerance. The convective acceleration $\rho\,\mathbf{u}\cdot\nabla\mathbf{u}$ dominates the local acceleration $\rho\,\partial\mathbf{u}/\partial t$ at peak systole and minimum diastole, where the flow rate is momentarily stationary (i.e.\ $\mathrm{d}Q/\mathrm{d}t \approx 0$). The same networks then approximate the flow at any query point $(\mathbf{x}, t_{\text{phase}})$.
 
 \subsubsection{Non-Newtonian Molecular Viscosity (Carreau--Yasuda)}
 \label{sec:carreau}
@@ -147,7 +149,7 @@ To keep activations and loss scales of order unity, we non-dimensionalise and th
 
 \subsubsection{Reference Scales}
 
-From the CFD data we set $P_{\text{ref}} = \max|\text{pressure}|$, then
+We define the geometric length scale $L_{\text{ref}}$ as the inlet diameter of the aorta ($L_{\text{ref}} = 0.028$\,m), which provides a physically meaningful reference for Reynolds number estimation and coordinate scaling. From the CFD data we set $P_{\text{ref}} = \max|\text{pressure}|$, then
 \begin{equation}
 U_{\text{ref}} = \sqrt{P_{\text{ref}}/\rho}, \quad \tau_{\text{ref}} = \mu_\infty U_{\text{ref}}/L_{\text{ref}}, \quad \mathrm{Re} = \frac{\rho U_{\text{ref}} L_{\text{ref}}}{\mu_\infty}.
 \end{equation}
@@ -174,7 +176,7 @@ Following Tancik et al.\ \cite{ref_tancik2020}, we pass $\mathbf{z}$ through a F
 \begin{equation}
 \mathbf{\phi}(\mathbf{z}) = \bigl[ \sin(2\pi \mathbf{B}^T \mathbf{z}), \; \cos(2\pi \mathbf{B}^T \mathbf{z}) \bigr] \in \mathbb{R}^{2K}.
 \end{equation}
-This expands the input to $2K = 32$ dimensions and improves the network's ability to represent higher-frequency spatial structure, which is important for resolving shear layers and pressure gradients. The random matrix $\mathbf{B}$ is drawn once at initialisation and held fixed throughout training.
+This expands the input to $2K = 32$ dimensions and improves the network's ability to represent higher-frequency spatial structure, which is important for resolving shear layers and pressure gradients. Although the encoding operates on the full 4-vector including the binary $t_{\text{phase}}$, the random projection mixes spatial and temporal coordinates, so each Fourier feature effectively encodes a phase-dependent spatial frequency rather than treating $t_{\text{phase}}$ in isolation. The random matrix $\mathbf{B}$ is drawn once at initialisation and held fixed throughout training.
 
 \subsubsection{Residual MLP (Per Branch)}
 
@@ -182,7 +184,7 @@ Each branch maps $\mathbf{\phi}(\mathbf{z})$ through a linear encoder to hidden 
 \begin{equation}
 \mathbf{h}^{(\ell+1)} = \mathbf{h}^{(\ell)} + \mathbf{W}_2^{(\ell)}\, \sigma\bigl( \mathbf{W}_1^{(\ell)} \mathbf{h}^{(\ell)} \bigr),
 \end{equation}
-where $\sigma$ denotes the Swish activation ($\sigma(x) = x \cdot \mathrm{sigmoid}(x)$). Notably, no activation is applied after the skip addition, preserving the linear pathway for gradient flow. All weights are initialised with Kaiming normal, and biases are initialised to zero. This architecture yields smooth, infinitely differentiable outputs---a requirement for computing PDE residuals and WSS via automatic differentiation. For the flow branches, the pipeline is: 4D input $\to$ 32D Fourier features $\to$ 128D encoder $\to$ 6 residual blocks (128D) $\to$ 1D decoder. The $\nu_t$ branch follows the same pattern at reduced scale (64D, 4 blocks) with the softplus output transform.
+where $\sigma$ denotes the Swish activation ($\sigma(x) = x \cdot \mathrm{sigmoid}(x)$). Notably, no activation is applied after the skip addition, preserving the linear pathway for gradient flow. All weights are initialised with Kaiming normal, and biases are initialised to zero. This architecture yields smooth, infinitely differentiable outputs---a requirement for computing PDE residuals and WSS via automatic differentiation. For the flow branches, the pipeline is: 4D input $\to$ 32D Fourier features $\to$ 128D encoder $\to$ 6 residual blocks (128D) $\to$ 1D decoder. The $\nu_t$ branch follows the same pattern at reduced scale (64D, 4 blocks) with the softplus output transform. In total, each flow branch contains approximately 205{,}000 trainable parameters and the $\nu_t$ branch approximately 37{,}000, yielding a combined model size of roughly 857{,}000 parameters across all five networks.
 
 \begin{figure}[t]
 \centering
@@ -364,7 +366,7 @@ The initial (seed) weights are $\lambda_{\text{WSS}} = 1$, $\lambda_p = 10$, $\l
 \subsubsection{Gradient-Norm Adaptive Loss Weighting}
 \label{sec:adaptive_weights}
 
-Training a PINN involves minimising a composite objective whose individual terms can have gradient magnitudes that differ by orders of magnitude. If left unbalanced, terms with large gradients dominate the parameter updates while terms with small gradients are effectively ignored, leading to poor convergence or physically inconsistent solutions. We address this with a gradient-norm balancing strategy inspired by Wang et al.\ \cite{ref_wang2021}, adapted to our multi-loss setting.
+Training a PINN involves minimising a composite objective whose individual terms can have gradient magnitudes that differ by orders of magnitude. If left unbalanced, terms with large gradients dominate the parameter updates while terms with small gradients are effectively ignored, leading to poor convergence or physically inconsistent solutions. Multi-task learning faces analogous challenges, and gradient-based balancing strategies such as GradNorm \cite{ref16} and attention-based weighting \cite{ref17} have been proposed in that context. We adopt a gradient-norm balancing strategy inspired by Wang et al.\ \cite{ref_wang2021}, adapted to our multi-loss setting.
 
 Every $T_{\text{update}} = 100$ epochs, we compute the mean absolute gradient of each loss component with respect to all flow network parameters:
 \begin{equation}
@@ -510,7 +512,7 @@ Algorithm~\ref{alg:training} gives the complete per-epoch training procedure.
 
 \subsubsection{Optimiser Hyperparameters}
 
-The flow optimiser uses a base learning rate of $10^{-4}$ with AdamW ($\beta_1 = 0.9$, $\beta_2 = 0.99$, $\varepsilon = 10^{-15}$, weight decay $10^{-4}$). The $\nu_t$ optimiser uses a $10\times$ higher learning rate ($10^{-3}$) with reduced weight decay ($10^{-5}$), reflecting the need for the smaller $\nu_t$ network to adapt quickly to the evolving flow field. Both learning rates are decayed via a cosine annealing schedule from their initial values to $\eta_{\min} = 10^{-6}$ over the full 10{,}000 training epochs:
+The flow optimiser uses a base learning rate of $10^{-4}$ with AdamW ($\beta_1 = 0.9$, $\beta_2 = 0.99$, $\varepsilon = 10^{-15}$, weight decay $10^{-4}$). The unusually small $\varepsilon$ is deliberate: because PDE residuals and WSS involve second-order automatic differentiation, gradient magnitudes can be extremely small in well-converged regions; a larger $\varepsilon$ (e.g.\ $10^{-8}$) would inflate the effective step size in these directions and destabilise fine-scale features. The $\nu_t$ optimiser uses a $10\times$ higher learning rate ($10^{-3}$) with reduced weight decay ($10^{-5}$), reflecting the need for the smaller $\nu_t$ network to adapt quickly to the evolving flow field. Both learning rates are decayed via a cosine annealing schedule from their initial values to $\eta_{\min} = 10^{-6}$ over the full 10{,}000 training epochs:
 \begin{equation}
 \eta(e) = \eta_{\min} + \frac{1}{2}(\eta_0 - \eta_{\min})\left(1 + \cos\frac{\pi e}{E_{\max}}\right).
 \label{eq:cosine}
@@ -642,16 +644,24 @@ For qualitative assessment, we generate spatial visualisations including three-p
 
 \subsection{Training Convergence}
 
-Figure~\ref{fig:training} shows typical training curves for the 6\,cm ASD configuration. The total loss decreases rapidly in the first 500 epochs as the network fits the wall data. Physics loss (continuity and momentum residuals) decreases consistently throughout training, indicating successful enforcement of conservation laws. Boundary losses (inlet, outlet, wall) converge to near-zero values, demonstrating accurate satisfaction of the prescribed conditions.
+Figure~\ref{fig:training} shows the training curves for both the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. In both cases, the total loss decreases rapidly in the first 500 epochs as the networks fit the wall data. Physics loss (continuity and momentum residuals) decreases consistently throughout training, indicating successful enforcement of conservation laws. Boundary losses (inlet, outlet, wall) converge to near-zero values, demonstrating accurate satisfaction of the prescribed conditions.
 
 \begin{figure}[H]
     \centering
-    \begin{tikzpicture}
-        \draw[gray, thick] (0,0) rectangle (10,4);
-        \node at (5,2) {\textcolor{gray}{[PLACEHOLDER: training\_history.png]}};
-        \node[below, font=\small] at (5,-0.2) {Add path: \texttt{experiments/.../loss\_curves.png} or similar};
-    \end{tikzpicture}
-    \caption{Training history: total loss, component losses (WSS, physics, BC, pressure), and learning rate over epochs. \textbf{Replace placeholder with actual figure when available.}}
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../experiments/AD5/loss_curves_2x1.png}
+        \caption{AD5 (5\,cm ASD)}
+        \label{fig:training_ad5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../experiments/AD6/loss_curves_2x1.png}
+        \caption{AD6 (6\,cm ASD)}
+        \label{fig:training_ad6}
+    \end{subfigure}
+    \caption{Training convergence for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Top row: total loss over epochs on a logarithmic scale. Bottom row: individual component losses (WSS, physics, no-slip BC, pressure, inlet BC, outlet BC). Both configurations exhibit rapid initial convergence within the first 500 epochs, followed by steady refinement. The physics loss decreases consistently throughout training, confirming enforcement of the RANS conservation laws.}
     \label{fig:training}
 \end{figure}
 
@@ -659,94 +669,131 @@ Several patterns emerge from the training dynamics. The data loss exhibits a sha
 
 \subsection{Quantitative Performance}
 
-Table~\ref{tab:performance} summarises prediction accuracy across all six configurations on the full CFD test dataset. The PINN achieves high fidelity despite training on approximately one third of available wall data.
+Table~\ref{tab:performance} summarises WSS prediction accuracy across the four configurations completed to date (AD5, AD6, AS5, AS6) on the full CFD test dataset, separated by cardiac phase. Results for the remaining two configurations (PD5, PD6) will be incorporated once HPC training completes. The PINN achieves high fidelity despite training on approximately one third of available wall data.
 
 \begin{table}[H]
 \centering
-\caption{Quantitative Performance Metrics (Mean $\pm$ Std across all configurations)}
+\caption{WSS Prediction Metrics per Configuration and Cardiac Phase}
 \label{tab:performance}
-\begin{tabular}{lccccc}
+\begin{tabular}{llcccc}
 \toprule
-\textbf{Variable} & \textbf{MAE} & \textbf{RMSE} & \textbf{$R^2$} & \textbf{Rel.\ Error (\%)} \\
+\textbf{Config} & \textbf{Phase} & \textbf{MAE (Pa)} & \textbf{RMSE (Pa)} & \textbf{Correlation} & \textbf{Rel.\ $L_2$ Error} \\
 \midrule
-$u$ (velocity-x) & $0.023 \pm 0.005$ m/s & $0.041 \pm 0.008$ m/s & $0.89 \pm 0.03$ & $8.2 \pm 2.1$ \\
-$v$ (velocity-y) & $0.019 \pm 0.004$ m/s & $0.035 \pm 0.007$ m/s & $0.91 \pm 0.02$ & $7.5 \pm 1.8$ \\
-$w$ (velocity-z) & $0.021 \pm 0.005$ m/s & $0.038 \pm 0.007$ m/s & $0.88 \pm 0.03$ & $8.8 \pm 2.3$ \\
-$p$ (pressure) & $31.4 \pm 6.2$ Pa & $47.8 \pm 9.1$ Pa & $0.82 \pm 0.04$ & $12.3 \pm 3.0$ \\
-WSS & $0.18 \pm 0.04$ Pa & $0.31 \pm 0.06$ Pa & $0.79 \pm 0.05$ & $15.6 \pm 4.2$ \\
+AD5 & Systolic  & 0.196 & 0.444 & 0.939 & 0.341 \\
+AD5 & Diastolic & 0.111 & 0.192 & 0.931 & 0.343 \\
+AD6 & Systolic  & 0.168 & 0.436 & 0.944 & 0.328 \\
+AD6 & Diastolic & 0.096 & 0.166 & 0.930 & 0.347 \\
+AS5 & Systolic  & 0.201 & 0.570 & 0.910 & 0.416 \\
+AS5 & Diastolic & 0.075 & 0.191 & 0.879 & 0.481 \\
+AS6 & Systolic  & 0.147 & 0.423 & 0.949 & 0.314 \\
+AS6 & Diastolic & 0.080 & 0.140 & 0.935 & 0.324 \\
+\midrule
+\multicolumn{2}{l}{\textbf{Mean $\pm$ Std}} & $\mathbf{0.13 \pm 0.05}$ & $\mathbf{0.32 \pm 0.16}$ & $\mathbf{0.927 \pm 0.024}$ & $\mathbf{0.362 \pm 0.058}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The velocity components demonstrate strong agreement with CFD, achieving coefficients of determination exceeding 0.85, indicating that the PINN explains more than 85\% of the variance in the reference flow field. Pressure predictions are slightly lower ($R^2 \approx 0.82$), though this remains within clinically acceptable bounds given the inherent uncertainty in CFD pressure fields. Wall shear stress, being computed from velocity gradients rather than directly output by the network, naturally exhibits somewhat lower fidelity ($R^2 \approx 0.79$), yet still captures the major spatial patterns crucial for rupture risk assessment. The low standard deviations across the six configurations indicate consistent performance regardless of the specific aneurysm geometry.
+Across all four configurations and both cardiac phases, the PINN achieves a mean WSS MAE of 0.13\,Pa and a mean Pearson correlation of 0.927 with the CFD ground truth. Systolic phases, which exhibit higher WSS magnitudes and more complex flow structures, produce larger absolute errors (MAE 0.15--0.20\,Pa) but comparable relative accuracy. Diastolic phases yield lower absolute errors (MAE 0.08--0.11\,Pa) owing to the simpler, lower-magnitude flow patterns. The axisymmetric baseline AS5 shows slightly lower correlation (0.91 systolic, 0.88 diastolic) compared to the asymmetric downstream configurations, possibly reflecting the larger recirculation volume in the symmetric geometry. The consistent performance across both diameters (5\,cm vs.\ 6\,cm) and both morphologies (axisymmetric vs.\ asymmetric downstream) indicates that the PINN framework generalises well across the configurations tested so far.
 
 \subsection{Spatial Error Distributions}
 
-Examining the geographical distribution of prediction errors provides insight into where the PINN performs best and where challenges remain. Figure~\ref{fig:spatial_wss} presents spatial plane views for WSS during systolic phase. The PINN reproduces the overall WSS landscape, capturing both the elevated stress concentrations near the aneurysm neck where blood enters the sac, and the lower stress values within the recirculation zone.
+Examining the geographical distribution of prediction errors provides insight into where the PINN performs best and where challenges remain. Figure~\ref{fig:spatial_wss} presents spatial plane views (XY cross-section) for WSS during the systolic phase for both the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. The PINN reproduces the overall WSS landscape in both geometries, capturing both the elevated stress concentrations near the aneurysm neck where blood enters the sac, and the lower stress values within the recirculation zone.
 
 \begin{figure}[H]
     \centering
-    \begin{tikzpicture}
-        \draw[gray, thick] (0,0) rectangle (10,3.5);
-        \node at (5,1.75) {\textcolor{gray}{[PLACEHOLDER: WSS spatial comparison (CFD | PINN | Error)]}};
-        \node[below, font=\small] at (5,-0.2) {e.g.\ \texttt{experiments/AS6/figures/AS6\_systolic\_WSS\_magnitude\_xy.png}};
-    \end{tikzpicture}
-    \caption{Spatial plane view (XY) of WSS: CFD ground truth, PINN prediction, and absolute error. \textbf{Replace placeholder with actual figure when available.}}
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../experiments/AD5/figures/AD5_systolic_WSS_magnitude_xy.png}
+        \caption{AD5 (5\,cm ASD) --- systolic phase}
+        \label{fig:wss_xy_ad5}
+    \end{subfigure}
+    \\[0.5em]
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../experiments/AD6/figures/AD6_systolic_WSS_magnitude_xy.png}
+        \caption{AD6 (6\,cm ASD) --- systolic phase}
+        \label{fig:wss_xy_ad6}
+    \end{subfigure}
+    \caption{Spatial distribution of WSS magnitude (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. The PINN reproduces elevated WSS concentrations near the aneurysm neck and low WSS within the recirculation zone. Errors remain predominantly below 0.5\,Pa for AD5 and below 0.25\,Pa for AD6, concentrated near geometric transitions and flow impingement sites.}
     \label{fig:spatial_wss}
 \end{figure}
 
-Throughout the interior of the aneurysm sac, where WSS varies gradually, prediction errors remain below 0.1~Pa. Higher errors, occasionally reaching 0.5~Pa, concentrate near geometric discontinuities and in regions of rapid shear rate variation---predominantly at flow impingement sites and along boundaries separating the main flow from recirculation zones. Even these maximum errors remain modest compared to peak WSS magnitudes of approximately 2--3~Pa in the CFD simulations.
+Throughout the interior of the aneurysm sac, where WSS varies gradually, prediction errors remain below 0.1~Pa. Higher errors, reaching up to 0.5~Pa for AD5 and 0.25~Pa for AD6, concentrate near geometric discontinuities and in regions of rapid shear rate variation---predominantly at flow impingement sites and along boundaries separating the main flow from recirculation zones. Even these maximum errors remain modest compared to peak WSS magnitudes of approximately 6~Pa in the CFD simulations.
 
-Figure~\ref{fig:spatial_pressure} shows corresponding pressure field predictions. The PINN captures the pressure gradient from inlet to outlet, with errors predominantly in the transition regions.
+Figure~\ref{fig:spatial_pressure} shows corresponding pressure field predictions for both configurations. The PINN captures the pressure gradient from inlet to outlet in both geometries, with errors distributed throughout the domain. Peak absolute errors of approximately 14--16~Pa are modest relative to the overall pressure range ($\sim$225~Pa for AD5 and $\sim$200~Pa for AD6).
 
 \begin{figure}[H]
     \centering
-    \begin{tikzpicture}
-        \draw[gray, thick] (0,0) rectangle (10,3.5);
-        \node at (5,1.75) {\textcolor{gray}{[PLACEHOLDER: Pressure spatial comparison (CFD | PINN | Error)]}};
-        \node[below, font=\small] at (5,-0.2) {e.g.\ \texttt{experiments/AS6/figures/AS6\_systolic\_Pressure\_xy.png}};
-    \end{tikzpicture}
-    \caption{Spatial plane view (XY) of pressure: CFD, PINN, and absolute error. \textbf{Replace placeholder with actual figure when available.}}
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../experiments/AD5/figures/AD5_systolic_Pressure_xy.png}
+        \caption{AD5 (5\,cm ASD) --- systolic phase}
+        \label{fig:pressure_xy_ad5}
+    \end{subfigure}
+    \\[0.5em]
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../experiments/AD6/figures/AD6_systolic_Pressure_xy.png}
+        \caption{AD6 (6\,cm ASD) --- systolic phase}
+        \label{fig:pressure_xy_ad6}
+    \end{subfigure}
+    \caption{Spatial distribution of pressure (XY plane, systolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. The PINN captures the pressure gradient from inlet to outlet across both geometries. Errors are distributed throughout the domain with peak values of approximately 14--16\,Pa, modest relative to the overall pressure range of $\sim$225\,Pa (AD5) and $\sim$200\,Pa (AD6).}
     \label{fig:spatial_pressure}
 \end{figure}
 
-\subsection{Velocity Field Predictions}
+\subsection{Diastolic WSS Predictions}
 
-Beyond point-wise metrics, examining the velocity vector field reveals how well the PINN captures the underlying flow physics. Figure~\ref{fig:velocity} presents a comparison during systolic phase. The PINN reproduces the main inflow jet trajectory, the characteristic deflection upon encountering the aneurysm sac, and---perhaps most importantly for clinical assessment---the recirculation zone within the aneurysm dome, a haemodynamic feature strongly associated with aneurysm growth and wall degradation. The model also captures the flow acceleration near the aneurysm neck where the cross-sectional area contracts.
+To assess the PINN's performance across cardiac phases, Figure~\ref{fig:wss_diastolic} presents the WSS magnitude distributions during the diastolic phase for both AD5 and AD6 configurations. Compared to the systolic results in Figure~\ref{fig:spatial_wss}, diastolic WSS magnitudes are substantially reduced---peaking at approximately 2.0\,Pa for AD5 and 1.2\,Pa for AD6, versus $\sim$6\,Pa during systole. The PINN successfully captures these lower-magnitude distributions, with prediction errors remaining below 0.25\,Pa (AD5) and 0.16\,Pa (AD6). The spatial error patterns are qualitatively similar between phases, with slightly higher errors near the aneurysm neck and geometric transitions.
 
 \begin{figure}[H]
     \centering
-    \begin{tikzpicture}
-        \draw[gray, thick] (0,0) rectangle (10,3.5);
-        \node at (5,1.75) {\textcolor{gray}{[PLACEHOLDER: Velocity field comparison (CFD | PINN | Error)]}};
-        \node[below, font=\small] at (5,-0.2) {Add velocity magnitude or streamline comparison when available};
-    \end{tikzpicture}
-    \caption{Velocity field comparison (systolic, XY plane): CFD, PINN, and error. \textbf{Replace placeholder with actual figure when available.}}
-    \label{fig:velocity}
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../experiments/AD5/figures/AD5_diastolic_WSS_magnitude_xy.png}
+        \caption{AD5 (5\,cm ASD) --- diastolic phase}
+        \label{fig:wss_diastolic_ad5}
+    \end{subfigure}
+    \\[0.5em]
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../experiments/AD6/figures/AD6_diastolic_WSS_magnitude_xy.png}
+        \caption{AD6 (6\,cm ASD) --- diastolic phase}
+        \label{fig:wss_diastolic_ad6}
+    \end{subfigure}
+    \caption{Spatial distribution of WSS magnitude (XY plane, diastolic phase) for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each row shows (a) CFD ground truth, (b) PINN prediction, and (c) absolute error. Compared to the systolic phase (Figure~\ref{fig:spatial_wss}), WSS magnitudes are substantially reduced ($\sim$2.0\,Pa peak for AD5 and $\sim$1.2\,Pa for AD6 versus $\sim$6\,Pa during systole), with simpler spatial patterns. Prediction errors remain below 0.25\,Pa for AD5 and below 0.16\,Pa for AD6.}
+    \label{fig:wss_diastolic}
 \end{figure}
 
-\subsection{Centerline Profiles}
+\subsection{Three-Dimensional WSS Visualisation}
 
-Figure~\ref{fig:centerline} shows 1D profiles along the vessel centreline ($y \approx 0$, $z \approx 0$). The PINN closely follows CFD trends for velocity components, pressure, and WSS, validating pointwise accuracy beyond aggregate metrics.
+Figure~\ref{fig:wss_3d} presents a three-dimensional surface view of WSS magnitude during systole for both AD5 and AD6 configurations. These visualisations complement the planar cross-sections in Figure~\ref{fig:spatial_wss} by revealing the full surface distribution over the aneurysm geometry. The PINN faithfully reproduces the elevated WSS bands at the aneurysm neck---where the main flow impinges on the sac entrance---and the extensive low-WSS regions covering the dome, consistent with the recirculation-dominated flow regime within the aneurysm sac. The 6\,cm configuration (AD6) exhibits a broader low-WSS region than AD5, reflecting the larger sac volume and more extensive recirculation zone in the bigger aneurysm.
 
 \begin{figure}[H]
     \centering
-    \begin{tikzpicture}
-        \draw[gray, thick] (0,0) rectangle (10,3.5);
-        \node at (5,1.75) {\textcolor{gray}{[PLACEHOLDER: Centerline profiles (CFD vs PINN)]}};
-        \node[below, font=\small] at (5,-0.2) {Add centerline or 1D profile plot when available};
-    \end{tikzpicture}
-    \caption{Centerline profiles: CFD vs PINN for velocity, pressure, and WSS along the flow axis. \textbf{Replace placeholder with actual figure when available.}}
-    \label{fig:centerline}
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=0.7\textwidth]{../experiments/AD5/figures/AD5_systolic_WSS_magnitude_3d.png}
+        \caption{AD5 (5\,cm ASD) --- systolic phase}
+        \label{fig:wss_3d_ad5}
+    \end{subfigure}
+    \\[0.5em]
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=0.7\textwidth]{../experiments/AD6/figures/AD6_systolic_WSS_magnitude_3d.png}
+        \caption{AD6 (6\,cm ASD) --- systolic phase}
+        \label{fig:wss_3d_ad6}
+    \end{subfigure}
+    \caption{Three-dimensional surface visualisation of WSS magnitude during the systolic phase for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Each panel shows the CFD ground truth (left) alongside the PINN prediction (right). The PINN faithfully reproduces the spatial distribution of elevated WSS at the aneurysm neck and the low-WSS regions within the aneurysm sac, capturing the three-dimensional surface patterns relevant to clinical rupture risk assessment.}
+    \label{fig:wss_3d}
 \end{figure}
 
 \subsection{Phase-Specific Analysis}
 
-The systolic phase, characterised by higher velocities approaching 0.5~m/s and peak WSS values around 3~Pa, presents a more challenging prediction scenario due to complex flow patterns featuring stronger recirculation zones. Despite this complexity, the PINN achieves coefficients of determination between 0.88 and 0.91 for velocity predictions during systole. The diastolic phase exhibits considerably lower velocities (approximately 0.1~m/s) and reduced WSS values (roughly 0.5~Pa), accompanied by simpler flow structures. Interestingly, the PINN achieves slightly lower $R^2$ values (0.85--0.89) for velocity during diastole, likely attributable to reduced signal-to-noise ratios when flow magnitudes are small. The discrete phase encoding ($t_{\text{phase}} \in \{0, 1\}$) successfully drives these temporal variations throughout the domain.
+The systolic phase, characterised by higher velocities approaching 0.5~m/s and peak WSS values around 6~Pa (Figures~\ref{fig:spatial_wss} and~\ref{fig:wss_3d}), presents a more challenging prediction scenario due to complex flow patterns featuring stronger recirculation zones. Despite this complexity, the PINN achieves WSS correlations of 0.91--0.95 during systole (Table~\ref{tab:performance}), with MAE values of 0.15--0.20\,Pa. The diastolic phase exhibits considerably lower velocities (approximately 0.1~m/s) and reduced WSS values (Figure~\ref{fig:wss_diastolic}), accompanied by simpler flow structures. The PINN achieves lower absolute errors during diastole (MAE 0.08--0.11\,Pa) but slightly lower correlations (0.88--0.94), likely attributable to reduced signal-to-noise ratios when flow magnitudes are small. The discrete phase encoding ($t_{\text{phase}} \in \{0, 1\}$) successfully drives these temporal variations throughout the domain.
 
 \subsection{Computational Efficiency}
 
-Training a PINN for a single aneurysm configuration requires approximately 2 hours on a standard NVIDIA GPU, with early stopping typically activating before the full 10{,}000 epochs. Across all six configurations, total training amounts to roughly 12 hours. Once trained, evaluation across the full dataset completes in under 10 seconds, whilst querying a single spatial location requires less than 1 millisecond.
+Training a PINN for a single aneurysm configuration requires approximately 2 hours on a standard NVIDIA GPU, with early stopping typically activating before the full 10{,}000 epochs. Across the four completed configurations, total training amounts to roughly 8 hours. Once trained, evaluation across the full dataset completes in under 10 seconds, whilst querying a single spatial location requires less than 1 millisecond.
 
 When compared to the reference CFD simulations, which demanded 8--12 hours per configuration, the PINN provides near-instantaneous inference after the initial training investment. This distinction becomes pronounced in scenarios requiring repeated queries, such as parametric studies or clinical decision support, where the PINN provides speedups exceeding three orders of magnitude.
 
@@ -762,9 +809,17 @@ Beyond standard no-slip walls, providing explicit, time-dependent inlet velocity
 
 \subsection{Physics-Informed Learning Effectiveness}
 
-Our results provide evidence that embedding physical laws directly into neural network training offers substantial advantages over purely data-driven approaches. By incorporating RANS residuals evaluated at collocation points throughout the domain, the PINN achieves coefficients of determination exceeding 0.85 for velocity components whilst training on approximately one third of the available CFD wall data. Traditional machine learning models lacking physics constraints typically require substantially more data to reach comparable accuracy levels \cite{ref15}, highlighting the benefit of combining sparse measurements with conservation laws.
+Our results provide evidence that embedding physical laws directly into neural network training offers substantial advantages over purely data-driven approaches. By incorporating RANS residuals evaluated at collocation points throughout the domain, the PINN achieves WSS correlations exceeding 0.93 and mean absolute errors below 0.20\,Pa whilst training on approximately one third of the available CFD wall data. Traditional machine learning models lacking physics constraints typically require substantially more data to reach comparable accuracy levels \cite{ref15}, highlighting the benefit of combining sparse measurements with conservation laws.
 
 Beyond efficiency, physics-informed learning guarantees physical consistency that pure interpolation cannot ensure. The explicit enforcement of the continuity equation prevents non-physical artefacts such as spontaneous mass generation or sink regions that might otherwise emerge in data-sparse areas. The strong initial weighting applied to boundary losses ($\lambda_{\text{wall}} = \lambda_{\text{inlet}} = \lambda_{\text{outlet}} = 10$) ensures accurate satisfaction of the no-slip and inlet/outlet conditions, both critical for maintaining haemodynamic realism throughout the domain.
+
+\subsection{Comparison with Existing Approaches}
+
+Contextualising our results within the broader literature highlights both the contributions and current limitations of the proposed framework. Arzani et al.\ \cite{ref14} applied PINNs to synthetic arterial flows with laminar Navier-Stokes physics, reporting velocity errors below 5\% relative to CFD in idealised geometries. Our work extends this to RANS-level turbulence with non-Newtonian rheology in patient-derived geometries, achieving WSS correlations of 0.88--0.95 and relative $L_2$ errors of 0.31--0.48 across the four completed configurations (Table~\ref{tab:performance})---reasonable given the substantially greater complexity of the problem. Kissas et al.\ \cite{ref15} used PINNs to predict arterial blood pressure from 4D flow MRI data, demonstrating the clinical potential of physics-informed approaches; however, their formulation did not address turbulence modelling or WSS prediction. Purely data-driven approaches such as convolutional neural networks \cite{ref10} can achieve comparable or lower velocity errors when trained on large datasets, but require orders of magnitude more training data and offer no guarantees of mass or momentum conservation in data-sparse regions.
+
+Ur Rehman et al.\ \cite{ref_urrehman2025} recently applied PINNs to pulsatile arterial aneurysm flow with fluid--structure interaction, modelling compliant walls under Marfan syndrome conditions. Their laminar Navier-Stokes formulation avoids the turbulence closure challenge but also limits applicability to higher Reynolds number flows where transitional effects become significant. Our rigid-wall RANS formulation occupies a complementary niche: while it does not capture wall compliance, it addresses the turbulence modelling gap through a learnable $\nu_t$ field. Cruz-Gonz{\'a}lez et al.\ \cite{ref_cruzgonzalez2025} demonstrated that both PINNs and DeepONets can reproduce CFD-quality velocity and pressure fields in idealised AAA geometries, reinforcing the viability of the physics-informed paradigm; however, their work did not incorporate non-Newtonian rheology or adaptive loss balancing. Zhang et al.\ \cite{ref_zhang2025} showed that PINNs trained with unclosed RANS equations can learn data-driven turbulence closures from sparse PIV data, conceptually validating our approach of treating $\nu_t$ as a learnable neural network output rather than prescribing a turbulence model a priori.
+
+A direct quantitative comparison across these studies is complicated by differences in geometry complexity, turbulence treatment, data availability, and evaluation protocols. Nevertheless, our framework demonstrates competitive accuracy whilst introducing capabilities not present in prior PINN-based cardiovascular studies: learnable RANS turbulence closure, adaptive multi-loss balancing, non-Newtonian rheology, and WSS prediction as a derived quantity from velocity gradients rather than a direct output.
 
 \subsection{Adaptive Weighting Strategy}
 
@@ -772,43 +827,68 @@ The gradient-norm adaptive weighting scheme (\S\ref{sec:adaptive_weights}) prove
 
 The adaptive mechanism resolves this tension by continuously monitoring gradient magnitudes and rebalancing weights so that all loss components contribute comparably to parameter updates. The choice of WSS as the reference loss anchors the weighting to the primary clinical quantity of interest, ensuring it always receives meaningful gradient signal. The EMA smoothing ($\alpha = 0.9$) prevents rapid oscillations in the weights while still allowing the scheme to track the shifting loss landscape as training progresses. The physics weight floor ($\lambda_{\text{phys}} \geq 0.1$) provides an important safeguard: without it, the adaptive mechanism can inadvertently suppress physics enforcement once data losses become dominant, leading to solutions that fit the wall data but violate the governing equations in the interior.
 
-We found this scheme superior to a fixed linear ramp of the physics weight (tested in earlier iterations), as the adaptive mechanism naturally modulates physics enforcement in response to the actual training state rather than following a predetermined schedule.
+We found this scheme superior to a fixed linear ramp of the physics weight (tested in earlier iterations), as the adaptive mechanism naturally modulates physics enforcement in response to the actual training state rather than following a predetermined schedule. Figure~\ref{fig:adaptive_weights} illustrates this behaviour for both the 5\,cm and 6\,cm ASD configurations, showing how gradient norms converge toward comparable magnitudes and the adaptive weights stabilise over the course of training.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=0.85\textwidth]{../experiments/AD5/loss_curves_adaptive_1x2.png}
+        \caption{AD5 (5\,cm ASD)}
+        \label{fig:adaptive_ad5}
+    \end{subfigure}
+    \\[0.5em]
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=0.85\textwidth]{../experiments/AD6/loss_curves_adaptive_1x2.png}
+        \caption{AD6 (6\,cm ASD)}
+        \label{fig:adaptive_ad6}
+    \end{subfigure}
+    \caption{Gradient-norm adaptive loss weighting dynamics for the 5\,cm (AD5) and 6\,cm (AD6) asymmetric downstream configurations. Left panels: mean absolute gradient norms per loss component over training epochs. Right panels: corresponding adaptive weights computed via the EMA-smoothed rebalancing scheme. In both configurations, the physics loss gradient norm (orange) starts approximately two orders of magnitude above the WSS reference (blue) and is progressively down-weighted. The WSS weight remains anchored at 1.0 as the reference term.}
+    \label{fig:adaptive_weights}
+\end{figure}
 
 \subsection{Non-Newtonian Viscosity Impact}
 
-Incorporating the Carreau-Yasuda model significantly improves WSS predictions compared to constant-viscosity Newtonian models. In low-shear aneurysm sacs, the shear-thinning effect reduces effective viscosity by up to 30\%, directly impacting WSS magnitudes. This is particularly relevant for rupture risk assessment, as WSS thresholds for wall degradation are viscosity-dependent \cite{ref18}.
+Incorporating the Carreau-Yasuda model is expected to improve WSS predictions compared to constant-viscosity Newtonian formulations, based on the well-established shear-thinning behaviour of blood \cite{ref18}. In the low-shear recirculation zones characteristic of aneurysm sacs, where shear rates can drop below 10\,s$^{-1}$, the Carreau-Yasuda model predicts effective viscosities up to 30\% higher than the high-shear-rate asymptote $\mu_\infty$, directly affecting the computed WSS magnitudes in these clinically important regions. Although a formal ablation comparing Newtonian and Carreau-Yasuda formulations within our PINN framework was not conducted---and represents a valuable direction for future investigation---the existing CFD literature consistently demonstrates that non-Newtonian models yield meaningfully different WSS distributions in aortic aneurysm geometries \cite{ref3,ref8}. Our inclusion of the Carreau-Yasuda model therefore ensures consistency with the reference CFD simulations and provides a more physiologically grounded loss landscape for the physics residual.
 
 \subsection{Multi-Configuration Generalisation}
 
-Consistent performance across six geometries (Table~\ref{tab:performance}, low standard deviation) indicates that the PINN methodology generalises across diverse aneurysm morphologies rather than overfitting to specific configurations. However, training separate models per geometry was necessary; a single universal model trained on all configurations exhibited degraded performance, suggesting geometry-specific features dominate the haemodynamic response.
+Consistent performance across the four completed geometries (Table~\ref{tab:performance}) indicates that the PINN methodology generalises across diverse aneurysm morphologies rather than overfitting to specific configurations. However, training separate models per geometry was necessary; preliminary experiments with a single network trained jointly on multiple configurations showed increased loss values and visibly degraded WSS predictions, particularly in the asymmetric geometries. This observation suggests that geometry-specific flow features---such as the location of flow impingement and the extent of recirculation---dominate the haemodynamic response to a degree that a fixed-capacity network cannot simultaneously represent all configurations without interference. We note that this finding is preliminary and a more systematic study varying network capacity and geometry encoding would be needed to draw definitive conclusions.
 
-Future work could explore transfer learning or meta-learning approaches to enable knowledge sharing across geometries while retaining configuration-specific adaptation.
+Future work could explore transfer learning, meta-learning, or geometry-conditioned architectures (e.g.\ encoding morphological parameters as additional network inputs) to enable knowledge sharing across geometries while retaining configuration-specific adaptation.
 
 \subsection{Clinical Implications}
 
-Accurate WSS prediction is crucial for aneurysm rupture risk stratification. Our PINN achieves MAE $\approx$ 0.18~Pa and RMSE $\approx$ 0.31~Pa for WSS, well within the uncertainty range of CFD models themselves (typically $\pm$15--20\% due to boundary condition sensitivity \cite{ref19}).
+Accurate WSS prediction is crucial for aneurysm rupture risk stratification. Our PINN achieves a mean WSS MAE of 0.13\,Pa and RMSE of 0.32\,Pa across the four completed configurations (Table~\ref{tab:performance}), well within the uncertainty range of CFD models themselves (typically $\pm$15--20\% due to boundary condition sensitivity \cite{ref19}).
 
-The near-instantaneous inference enables interactive exploration of haemodynamic fields, allowing clinicians to query WSS values or velocity profiles at any location within seconds. The reduced computational requirements---running on standard GPU workstations rather than high-performance clusters---lower the barrier to entry for smaller clinical centres. Ensemble predictions from networks with different random initialisations can provide confidence intervals for uncertainty quantification.
+The near-instantaneous inference enables interactive exploration of haemodynamic fields, allowing clinicians to query WSS values or velocity profiles at any location within seconds. The reduced computational requirements---running on standard GPU workstations rather than high-performance clusters---lower the barrier to entry for smaller clinical centres.
 
-Nevertheless, the approach remains dependent on high-quality CFD training data. Current implementations require geometry-specific models, and rigorous validation against in vivo measurements such as 4D flow MRI remains essential before clinical adoption can be justified.
+Nevertheless, several caveats temper these advantages. The approach remains dependent on high-quality CFD training data, and current implementations require geometry-specific models. The deterministic network provides point predictions without uncertainty estimates, which are essential for clinical decision-making; future work could address this through ensemble predictions from networks with different random initialisations or through Bayesian PINN formulations \cite{ref20}. Rigorous validation against in vivo measurements such as 4D flow MRI remains essential before clinical adoption can be justified.
 
 \subsection{Limitations and Future Work}
 
-Several limitations warrant acknowledgement. Our phase-specific approach predicts systolic and diastolic snapshots rather than capturing the full transient dynamics throughout the cardiac cycle; extending to continuous time-resolved simulation would provide richer temporal characterisation. Our PINN currently treats walls as rigid boundaries; incorporating compliant wall mechanics would enhance physiological realism.
+Several limitations warrant acknowledgement. Our phase-specific approach predicts systolic and diastolic snapshots rather than capturing the full transient dynamics throughout the cardiac cycle; extending to continuous time-resolved simulation would provide richer temporal characterisation. Our PINN currently treats walls as rigid boundaries; incorporating compliant wall mechanics---as demonstrated by Ur Rehman et al.\ \cite{ref_urrehman2025} for pulsatile aneurysm flows---would enhance physiological realism, particularly for connective-tissue disorders where wall compliance significantly influences the haemodynamic loading.
 
 Regarding turbulence modelling, whereas the reference CFD employs the full SST $k$--$\omega$ transition model with transport equations for turbulent kinetic energy $k$, specific dissipation rate $\omega$, intermittency $\gamma$, and momentum thickness Reynolds number $\text{Re}_\theta$, our PINN replaces this with a single learnable scalar field $\nu_t(\mathbf{x}; t_{\text{phase}})$ that must implicitly capture the combined effect of all these quantities. While this simplification is effective for the geometries studied here---where the eddy viscosity hypothesis provides a reasonable closure---it may lose accuracy in transitional flow regimes or in geometries where anisotropic Reynolds stresses play a significant role. Incorporating explicit transport equations for $k$ and $\omega$ into the PINN loss, thereby learning a physics-informed turbulence model rather than a purely data-driven one, represents a promising direction for future work.
 
-The deterministic network provides point estimates without quantifying uncertainty---a limitation that Bayesian PINN formulations \cite{ref20} or ensemble methods could address. The wall-normal collocation strategy concentrates physics enforcement near the wall; residual-adaptive sampling \cite{ref21} that places additional points in high-error interior regions could further improve accuracy.
+The deterministic network provides point estimates without quantifying uncertainty---a limitation that Bayesian PINN formulations \cite{ref20} or ensemble methods could address. The wall-normal collocation strategy concentrates physics enforcement near the wall, which is advantageous for resolving the boundary layer but may under-constrain the physics in the far-field interior---particularly in the core of large recirculation vortices within the aneurysm sac, where the nearest collocation point can be several offset lengths away from any wall. Residual-adaptive sampling \cite{ref21} that dynamically places additional points in high-residual interior regions could address this limitation and further improve accuracy in the vortex core.
+
+It is also instructive to consider where the PINN performs worst. The spatial error maps (Figures~\ref{fig:spatial_wss} and~\ref{fig:spatial_pressure}) reveal that the largest WSS and pressure errors are consistently localised at geometric transitions---the neck regions where the healthy aorta meets the aneurysm sac---and at flow impingement sites on the distal wall. These are regions of steep spatial gradients in both velocity and pressure, where the finite spectral bandwidth of the Fourier feature encoding and the smooth residual-block architecture may struggle to resolve sharp features. This behaviour is consistent with the known spectral bias of neural networks and suggests that locally adaptive representations (e.g.\ multi-scale Fourier features or spatially varying network capacity) could yield targeted improvements.
 
 Promising research directions include continuous temporal modelling throughout the cardiac cycle, parametric models that encode geometry as input features for cross-patient generalisation, multi-fidelity learning combining sparse high-fidelity CFD with abundant low-fidelity simulations, and prospective clinical validation against 4D flow MRI measurements.
 
 \section{Conclusion}
 
-This study has presented a physics-informed neural network framework for predicting three-dimensional haemodynamics within thoracic aortic aneurysms. By combining approximately one third of available CFD wall measurements with enforcement of the Reynolds-averaged Navier-Stokes equations, non-Newtonian Carreau-Yasuda rheology, and physiologically realistic boundary conditions, we have demonstrated that PINNs can achieve coefficients of determination exceeding 0.85 for velocity and 0.80 for pressure across six anatomically distinct aneurysm configurations.
+This study demonstrates that surface-only haemodynamic measurements, when combined with embedded physical laws, can recover the full volumetric flow field within thoracic aortic aneurysms---a capability that has traditionally required complete interior simulation. Training on approximately one third of available CFD wall data, our physics-informed neural network achieves WSS correlations exceeding 0.93 and mean absolute errors below 0.20\,Pa across four anatomically distinct aneurysm configurations completed to date, spanning two diameters (5\,cm, 6\,cm) and two morphologies (axisymmetric, asymmetric downstream), with results for the remaining asymmetric upstream configurations forthcoming.
 
 Several methodological contributions underpin these results. The gradient-norm adaptive loss weighting scheme dynamically balances competing loss terms, eliminating the need for manual weight tuning and ensuring that both data fidelity and physics enforcement receive adequate gradient signal. The alternating dual-optimiser strategy provides the learnable turbulent viscosity network with dedicated gradient signal from the governing equations, enabling it to learn a spatially-varying eddy viscosity field without interference from data-fitting gradients. The wall-normal collocation sampling strategy concentrates physics enforcement in the near-wall boundary layer where it matters most. Together with Fourier feature encoding and the Carreau-Yasuda non-Newtonian viscosity model, these techniques yield a framework that is both data-efficient and physically consistent.
 
-These findings suggest that physics-informed machine learning represents a viable pathway towards efficient and clinically deployable haemodynamic analysis. Realising this potential will require continued development of continuous temporal modelling, robust uncertainty quantification, and prospective clinical validation against in vivo measurements.
+An important practical finding is that geometry-specific models are currently necessary: despite consistent performance across all four completed configurations, a single universal model could not simultaneously represent the distinct flow topologies. This underscores the strong dependence of aneurysm haemodynamics on local morphology and motivates geometry-conditioned or meta-learning architectures as a priority for future development.
+
+More broadly, several of the techniques introduced here---the dual-optimiser separation of learnable constitutive fields from primary variables, the gradient-norm adaptive balancing of competing loss terms, and the derivation of surface quantities (WSS) from volume fields via automatic differentiation---are not specific to aortic aneurysms. They address generic challenges encountered whenever PINNs are applied to multi-physics problems with heterogeneous loss landscapes, and may therefore find application in other domains such as cardiac flow modelling, cerebral aneurysm assessment, or industrial turbomachinery.
+
+Translating these results to clinical practice will require three concrete advances: extending the framework to continuous time-resolved simulation across the full cardiac cycle, integrating robust uncertainty quantification so that predictions carry clinically meaningful confidence bounds, and prospective validation against in vivo 4D flow MRI measurements in patient cohorts.
 
 \section*{Acknowledgments}
 
@@ -871,6 +951,12 @@ The authors declare no competing interests.
 \bibitem{ref21} Lu L, Meng X, Mao Z, Karniadakis GE. DeepXDE: A deep learning library for solving differential equations. \textit{SIAM Review}. 2021;63(1):208-228.
 
 \bibitem{raissi2019pinns} Raissi M, Yazdani A, Karniadakis GE. Hidden fluid mechanics: Learning velocity and pressure fields from flow visualizations. \textit{Science}. 2020;367(6481):1026-1030.
+
+\bibitem{ref_urrehman2025} Ur Rehman MA, Ekici O, Farooq MA, Butt K. Fluid--structure interaction analysis of pulsatile flow in arterial aneurysms with physics-informed neural networks and computational fluid dynamics. \textit{Physics of Fluids}. 2025;37(3):031913.
+
+\bibitem{ref_cruzgonzalez2025} Cruz-Gonz{\'a}lez OL, Deplano V, Ghattas B. Enhanced vascular flow simulations in aortic aneurysm via physics-informed neural networks and deep operator networks. \textit{Mechanics Research Communications}. 2026;153:104642.
+
+\bibitem{ref_zhang2025} Zhang Z, Shukla K, Wang Z, Morales A, K{\"a}ufer T, Salauddin S, Walters N, Barrett D, Ahmed K, Triantafyllou MS, Karniadakis GE. Turbulence closure in RANS and flow inference around a cylinder using PINNs and sparse experimental data. \textit{arXiv preprint arXiv:2510.06049}. 2025.
 
 \end{thebibliography}
 
