@@ -1,52 +1,29 @@
 # Training run status (as of check)
 
-## Current runs
+## Completed runs (all six)
 
-| Config | GPU | Log file | Status |
-|--------|-----|----------|--------|
-| AS5 | 0 | logs/AS5_20260218_232651.log | Running (~12%, epoch ~1180/10000) |
-| AS6 | 1 | logs/AS6_20260219_001759.log | Running (just started) |
+| Config | Status | Notes |
+|--------|--------|--------|
+| AS5 | Done | Rerun with patience=1000 in progress (was 3000) |
+| AS6 | Done | Rerun with patience=1000 in progress (was 3000) |
+| AD5 | Done | patience=1000 |
+| AD6 | Done | patience=1000 |
+| PD5 | Done | patience=1000 |
+| PD6 | Done | patience=1000 |
 
-## AS5 – Epoch 1000 evaluation (interim)
+**Early stopping:** All configs use `patience: 1000` now. AS5 and AS6 were originally run with patience=3000; reruns with patience=1000 are launched so results are consistent.
 
-- **WSS**: Correlation **0.98** (systolic), **0.97** (diastolic); Relative L2 0.19 / 0.25 — **good**.
-- **Physics**: Momentum residuals ~170–207, continuity ~143–151 (still high; typical for mid-training).
-- **nu_t**: Mean ~0.002, max ~0.31–0.37 — **not collapsed**, learning.
-- **Carreau-Yasuda μ_ratio**: Mean ~1.02, max ~1.09 — active.
+## Reruns (patience=1000)
 
-Final metrics, figures, and comparison plots are written only when training **completes** (see below).
+AS5 and AS6 are being rerun with the same early-stopping patience (1000) as the other configs. Logs: `logs/AS5_patience1000_*.log`, `logs/AS6_patience1000_*.log`.
 
 ## When a run completes
 
-The trainer will write to `experiments/<GEOM>/`:
+The trainer writes to `experiments/<GEOM>/`:
 
 - `loss_curves.png` – loss history
 - `evaluation_metrics.csv` – WSS and other metrics per phase
-- `best_model.pt` – best checkpoint (already updated during training)
+- `best_model.pt` – best checkpoint
 - CFD vs PINN comparison plots (if generation succeeds)
 
-## Run the remaining configs (AD5, AD6, PD5, PD6)
-
-When a GPU is free, start one of these (use the free GPU index for `CUDA_VISIBLE_DEVICES`):
-
-```bash
-cd /home/olarinoyem/Project/TAA-aneurysm
-source ~/miniconda3/etc/profile.d/conda.sh && conda activate deep_tf
-
-# Example: AD5 on GPU 0 (when AS5 has finished)
-LOGFILE="logs/AD5_$(date +%Y%m%d_%H%M%S).log"
-CUDA_VISIBLE_DEVICES=0 nohup python -u -m src.training.trainer --config configs/AD5_config.yaml > "$LOGFILE" 2>&1 &
-echo "Log: $LOGFILE"
-
-# AD6 on GPU 1 (when AS6 has finished)
-LOGFILE="logs/AD6_$(date +%Y%m%d_%H%M%S).log"
-CUDA_VISIBLE_DEVICES=1 nohup python -u -m src.training.trainer --config configs/AD6_config.yaml > "$LOGFILE" 2>&1 &
-
-# PD5 (use whichever GPU is free)
-CUDA_VISIBLE_DEVICES=0 nohup python -u -m src.training.trainer --config configs/PD5_config.yaml > "logs/PD5_$(date +%Y%m%d_%H%M%S).log" 2>&1 &
-
-# PD6 (use whichever GPU is free)
-CUDA_VISIBLE_DEVICES=1 nohup python -u -m src.training.trainer --config configs/PD6_config.yaml > "logs/PD6_$(date +%Y%m%d_%H%M%S).log" 2>&1 &
-```
-
-Check which GPU is free: `nvidia-smi`
+Check GPU: `nvidia-smi`

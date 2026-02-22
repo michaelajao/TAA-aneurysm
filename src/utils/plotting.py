@@ -655,9 +655,10 @@ def generate_full_metrics_summary(out_dir=None, device="cuda"):
     """Recompute all metrics from checkpoints and produce the publication summary table.
 
     Outputs:
-      - experiments/full_metrics.csv          (per-geometry, per-phase rows)
-      - experiments/summary_table.csv         (Mean ± Std across all configs)
-      - experiments/summary_bar_chart.png     (bar chart)
+      - experiments/full_metrics.csv               (per-geometry, per-phase rows)
+      - experiments/summary_table.csv              (Mean ± Std across all configs)
+      - experiments/summary_bar_chart_wss.png      (WSS R² and rel. error)
+      - experiments/summary_bar_chart_pressure.png (Pressure R² and rel. error)
     """
     _apply_pub_style()
     if out_dir is None:
@@ -705,43 +706,49 @@ def generate_full_metrics_summary(out_dir=None, device="cuda"):
     print(f"Summary table saved: {summary_path}")
     print("\n" + summary_df.to_string(index=False))
 
-    # ── Bar chart ──────────────────────────────────────────────────────────
+    # ── Bar charts: WSS 1x2, Pressure in separate figure ─────────────────────
     geoms = df["geometry"].unique()
     phases = df["phase"].unique()
     x = np.arange(len(geoms))
     width = 0.35
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
+    def _draw_bar_panels(axes, specs):
+        for ax, metric, ylabel, title in specs:
+            for j, phase in enumerate(phases):
+                subset = df[df["phase"] == phase]
+                vals = [subset[subset["geometry"] == g][metric].values[0]
+                        if len(subset[subset["geometry"] == g]) > 0 else 0
+                        for g in geoms]
+                offset = (j - 0.5) * width
+                bars = ax.bar(x + offset, vals, width, label=phase.capitalize(), alpha=0.85)
+                for bar, v in zip(bars, vals):
+                    ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                            f"{v:.2f}", ha="center", va="bottom", fontsize=8)
+            ax.set_xticks(x)
+            ax.set_xticklabels(geoms)
+            ax.set_xlabel("Geometry")
+            ax.set_ylabel(ylabel)
+            ax.set_title(title)
+            ax.legend()
+            ax.grid(True, alpha=0.2, axis="y")
 
-    chart_specs = [
-        (axes[0, 0], "wss_r2",              r"$R^2$",              "(a) WSS $R^2$"),
-        (axes[0, 1], "wss_rel_error_pct",   "Rel. Error (%)",     "(b) WSS Rel. Error"),
-        (axes[1, 0], "pressure_r2",         r"$R^2$",              "(c) Pressure $R^2$"),
-        (axes[1, 1], "pressure_rel_error_pct", "Rel. Error (%)",  "(d) Pressure Rel. Error"),
-    ]
+    fig_wss, axes_wss = plt.subplots(1, 2, figsize=(14, 5.5), constrained_layout=True)
+    _draw_bar_panels(axes_wss, [
+        (axes_wss[0], "wss_r2",            r"$R^2$",            "(a) WSS $R^2$"),
+        (axes_wss[1], "wss_rel_error_pct", "Rel. Error (%)",    "(b) WSS Rel. Error"),
+    ])
+    fig_wss.savefig(out_dir / "summary_bar_chart_wss.png", dpi=300)
+    plt.close(fig_wss)
+    print(f"Summary bar chart (WSS) saved: {out_dir / 'summary_bar_chart_wss.png'}")
 
-    for ax, metric, ylabel, title in chart_specs:
-        for j, phase in enumerate(phases):
-            subset = df[df["phase"] == phase]
-            vals = [subset[subset["geometry"] == g][metric].values[0]
-                    if len(subset[subset["geometry"] == g]) > 0 else 0
-                    for g in geoms]
-            offset = (j - 0.5) * width
-            bars = ax.bar(x + offset, vals, width, label=phase.capitalize(), alpha=0.85)
-            for bar, v in zip(bars, vals):
-                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
-                        f"{v:.2f}", ha="center", va="bottom", fontsize=8)
-        ax.set_xticks(x)
-        ax.set_xticklabels(geoms)
-        ax.set_xlabel("Geometry")
-        ax.set_ylabel(ylabel)
-        ax.set_title(title)
-        ax.legend()
-        ax.grid(True, alpha=0.2, axis="y")
-
-    fig.savefig(out_dir / "summary_bar_chart.png", dpi=300)
-    plt.close(fig)
-    print(f"Summary bar chart saved: {out_dir / 'summary_bar_chart.png'}")
+    fig_pressure, axes_pressure = plt.subplots(1, 2, figsize=(14, 5.5), constrained_layout=True)
+    _draw_bar_panels(axes_pressure, [
+        (axes_pressure[0], "pressure_r2",              r"$R^2$",              "(a) Pressure $R^2$"),
+        (axes_pressure[1], "pressure_rel_error_pct",   "Rel. Error (%)",     "(b) Pressure Rel. Error"),
+    ])
+    fig_pressure.savefig(out_dir / "summary_bar_chart_pressure.png", dpi=300)
+    plt.close(fig_pressure)
+    print(f"Summary bar chart (Pressure) saved: {out_dir / 'summary_bar_chart_pressure.png'}")
 
 
 def generate_summary_table_and_charts(out_dir=None):
@@ -797,8 +804,8 @@ def generate_summary_table_and_charts(out_dir=None):
     x = np.arange(len(geoms))
     width = 0.35
 
+    # WSS summary: 1x2 (Relative L2, Correlation)
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), constrained_layout=True)
-
     for i, metric, ylabel, title in [
         (0, "wss_rel_l2",      r"Relative $L_2$ Error",  r"(a) WSS Relative $L_2$"),
         (1, "wss_correlation", "Pearson Correlation",     "(b) WSS Correlation"),
@@ -822,10 +829,39 @@ def generate_summary_table_and_charts(out_dir=None):
         ax.set_title(title)
         ax.legend()
         ax.grid(True, alpha=0.2, axis="y")
-
     fig.savefig(out_dir / "summary_bar_chart.png", dpi=300)
     plt.close(fig)
-    print(f"  Summary bar chart saved: {out_dir / 'summary_bar_chart.png'}")
+    print(f"  Summary bar chart (WSS) saved: {out_dir / 'summary_bar_chart.png'}")
+
+    # Pressure summary: separate figure when columns exist
+    if "pressure_r2" in summary.columns and "pressure_rel_error_pct" in summary.columns:
+        fig_p, axes_p = plt.subplots(1, 2, figsize=(14, 5.5), constrained_layout=True)
+        for i, metric, ylabel, title in [
+            (0, "pressure_r2", "R²", "(a) Pressure R²"),
+            (1, "pressure_rel_error_pct", "Rel. Error (%)", "(b) Pressure Rel. Error"),
+        ]:
+            ax = axes_p[i]
+            for j, phase in enumerate(phases):
+                subset = summary[summary["phase"] == phase]
+                vals = []
+                for g in geoms:
+                    row = subset[subset["geometry"] == g]
+                    vals.append(row[metric].values[0] if len(row) > 0 else 0)
+                offset = (j - 0.5) * width
+                bars = ax.bar(x + offset, vals, width, label=phase.capitalize(), alpha=0.85)
+                for bar, v in zip(bars, vals):
+                    ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                            f"{v:.2f}", ha="center", va="bottom", fontsize=9)
+            ax.set_xticks(x)
+            ax.set_xticklabels(geoms)
+            ax.set_xlabel("Geometry")
+            ax.set_ylabel(ylabel)
+            ax.set_title(title)
+            ax.legend()
+            ax.grid(True, alpha=0.2, axis="y")
+        fig_p.savefig(out_dir / "summary_bar_chart_pressure.png", dpi=300)
+        plt.close(fig_p)
+        print(f"  Summary bar chart (Pressure) saved: {out_dir / 'summary_bar_chart_pressure.png'}")
 
 
 # ── Main logic ────────────────────────────────────────────────────────────
