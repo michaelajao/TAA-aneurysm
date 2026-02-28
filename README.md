@@ -226,15 +226,6 @@ TAA CFD data from 6 patient-specific geometries, each with systolic and diastoli
 
 Each CSV contains wall surface coordinates (X, Y, Z), pressure, and WSS vector components from CFD simulations. Wall points are subsampled (default 10x) to ~7,085 points per phase.
 
-## Evaluation Metrics
-
-| Metric | Target |
-|--------|--------|
-| WSS Relative L2 Error | < 10% |
-| WSS Correlation | > 0.90 |
-| Physics Residuals (momentum, continuity) | < 0.01 |
-
-Evaluation produces 3-panel comparison plots (CFD | PINN | Absolute Error) for WSS magnitude, WSS components, and pressure across XY, XZ, YZ planes.
 
 <!-- ## References
 
