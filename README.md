@@ -236,9 +236,9 @@ Each CSV contains wall surface coordinates (X, Y, Z), pressure, and WSS vector c
 
 Evaluation produces 3-panel comparison plots (CFD | PINN | Absolute Error) for WSS magnitude, WSS components, and pressure across XY, XZ, YZ planes.
 
-## References
+<!-- ## References
 
 - Arzani, A., Wang, J.X., & D'Souza, R.M. (2021). "Uncovering near-wall blood flow from sparse data with physics-informed neural networks." *Physics of Fluids*, 33(7).
 - Wang, S., Teng, Y., & Perdikaris, P. (2021). "Understanding and mitigating gradient flow pathologies in physics-informed neural networks." *SIAM J. Sci. Comput.*, 43(5), A3055-A3081.
 - Raissi, M., Perdikaris, P., & Karniadakis, G.E. (2019). "Physics-informed neural networks: A deep learning framework for solving forward and inverse problems." *J. Comput. Phys.*, 378, 686-707.
-- Tancik, M., et al. (2020). "Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains." *NeurIPS 2020*.
+- Tancik, M., et al. (2020). "Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains." *NeurIPS 2020*. -->
