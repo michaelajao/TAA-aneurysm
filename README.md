@@ -18,14 +18,6 @@ By matching WSS, the network learns the **derivative of velocity** at boundaries
 
 ```
 TAA-aneurysm/
-├── configs/                    # Experiment configurations (YAML)
-│   ├── AS5_config.yaml         # Baseline config for each geometry
-│   ├── AS5_adaptive_v2.yaml    # Adaptive weights (Wang et al. 2021)
-│   ├── AD5_config.yaml
-│   ├── AD6_config.yaml
-│   ├── AS6_config.yaml
-│   ├── PD5_config.yaml
-│   └── PD6_config.yaml
 ├── data/                       # CFD simulation data (CSV)
 ├── src/
 │   ├── data/loader.py          # Data loading and non-dimensionalization
@@ -41,41 +33,105 @@ TAA-aneurysm/
 │   └── utils/
 │       ├── geometry.py         # Wall normals, collocation point sampling
 │       └── plotting.py         # CFD vs PINN comparison plots
-├── experiments/                # Training outputs (checkpoints, logs, figures)
-├── scripts/run_training.sh     # Batch training launcher
-└── logs/                       # Training log files
+├── train.py                    # Entry-point training script
+└── requirements.txt            # Python dependencies
 ```
 
-## Quick Start
+## Setup
 
 ```bash
-# Activate environment
-conda activate deep_tf
+# Clone the repository
+git clone https://github.com/michaelajao/TAA-aneurysm.git
+cd TAA-aneurysm
 
+# Create and activate a conda environment
+conda create -n taa_pinn python=3.10 -y
+conda activate taa_pinn
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+## Configuration
+
+The training script expects a YAML configuration file. Create a `configs/` directory and add a config for each geometry (e.g. `configs/AS5_config.yaml`):
+
+```yaml
+data:
+  geometry: AS5                   # geometry identifier
+  phases: [systolic, diastolic]
+  data_dir: data/
+  files:
+    systolic: "5cm systolic.csv"
+    diastolic: "5cm diastolic.csv"
+  subsample_factor: 3
+  normalization:
+    length_scale: 0.05
+
+model:
+  architecture: fourier_residual
+  input_dim: 4
+  hidden_dim: 128
+  num_layers: 6
+  use_fourier: true
+  num_frequencies: 16
+  fourier_scale: 1.0
+  device: cuda                    # or "cpu"
+
+training:
+  batch_size: 4096
+  wall_batch_size: 16000
+  epochs: 10000
+  learning_rate: 0.0001
+  scheduler:
+    type: CosineAnnealingLR
+    eta_min: 1.0e-6
+  gradient_clip: 1.0
+  output_dir: experiments/AS5/    # where to save checkpoints & figures
+
+loss_weights:
+  lambda_physics: 0.01
+  lambda_BC_noslip: 10.0
+  lambda_WSS: 1.0
+  lambda_pressure: 10.0
+
+adaptive_weights:
+  enabled: true
+  update_interval: 100
+  alpha: 0.9
+  ref_loss: wss
+```
+
+Create one config per geometry (`AD5`, `AD6`, `AS5`, `AS6`, `PD5`, `PD6`), adjusting `data.geometry`, `data.files`, and `training.output_dir` accordingly. The data file mapping is:
+
+| Geometry | Systolic File | Diastolic File |
+|----------|---------------|----------------|
+| AS5 | `5cm systolic.csv` | `5cm diastolic.csv` |
+| AS6 | `6cm systolic.csv` | `6cm diastolic.csv` |
+| AD5 | `5cm ASD systolic.csv` | `5cm ASD Diastolic.csv` |
+| AD6 | `6cm ASD Systolic.csv` | `6cm ASD diastolic.csv` |
+| PD5 | `5cm ASU systolic.csv` | `5cm ASU Diastolic.csv` |
+| PD6 | `6cm ASU systolic.csv` | `6cm ASU Diastolic.csv` |
+
+## Usage
+
+```bash
 # Train a single geometry
-CUDA_VISIBLE_DEVICES=1 python -u -m src.training.trainer \
-  --config configs/AS5_adaptive_v2.yaml 2>&1 | tee experiments/AS5_adaptive_v2/train.log
+python -u -m src.training.trainer --config configs/AS5_config.yaml
 
-# Resume from checkpoint
-CUDA_VISIBLE_DEVICES=1 python -u -m src.training.trainer \
-  --config configs/AS5_adaptive_v2.yaml \
-  --resume experiments/AS5_adaptive_v2/best_model.pt
+# Resume from a checkpoint
+python -u -m src.training.trainer --config configs/AS5_config.yaml \
+  --resume experiments/AS5/best_model.pt
 
-# Train all geometries on a specific GPU
-GPU=1 bash scripts/run_training.sh
+# Select a specific GPU
+CUDA_VISIBLE_DEVICES=0 python -u -m src.training.trainer \
+  --config configs/AS5_config.yaml
 
 # Generate comparison plots from a trained model
 python -m src.utils.plotting --geom AS5
 
-# Generate publication-quality loss curve plots
-python -m src.utils.plotting --loss-plots --geom AS5
-
 # Generate cross-geometry summary bar chart
 python -m src.utils.plotting --summary
-
-# bash scripts/run_training.sh to train all geometries on a specific GPU
-GEOMS="AD5 AD6" GPU=0 bash scripts/run_training.sh
-
 ```
 
 ## Network Architecture

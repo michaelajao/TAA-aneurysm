@@ -30,3 +30,11 @@ Thumbs.db
 
 # latex / paper
 doc/
+
+# Claude AI
+.claude/
+
+# Machine-specific configs and scripts
+configs/
+scripts/
+CHANGELOG.md
