@@ -206,9 +206,9 @@ CFD wall data from six TAA geometries, each resolved at systolic and diastolic c
 
 Each CSV contains wall surface coordinates (*X*, *Y*, *Z*), pressure, and WSS vector components. -->
 
-<!-- ## Method Overview
+## Method Overview
 
-The framework uses five scalar-valued neural networks sharing the input (*x*, *y*, *z*, *t*_phase): four for the flow variables (*u*, *v*, *w*, *p*) and one for the learnable turbulent viscosity *ν*_t. Each branch employs Fourier feature encoding followed by a residual MLP with Swish activations. The total loss combines WSS matching, RANS momentum and continuity residuals, no-slip boundary enforcement, and pressure supervision, balanced by gradient-norm adaptive weighting (Wang et al., 2021). Full methodological details are provided in the accompanying paper. -->
+The framework uses five scalar-valued neural networks sharing the input (*x*, *y*, *z*, *t*_phase): four for the flow variables (*u*, *v*, *w*, *p*) and one for the learnable turbulent viscosity *ν*_t. Each branch employs Fourier feature encoding followed by a residual MLP with Swish activations. The total loss combines WSS matching, RANS momentum and continuity residuals, no-slip boundary enforcement, and pressure supervision, balanced by gradient-norm adaptive weighting by (Wang et al., 2021). Full methodological details are provided in the accompanying paper.
 
 ## Citation
 
