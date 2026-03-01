@@ -483,7 +483,7 @@ class TAATrainer:
         wall_batch_size = self.config['training'].get('wall_batch_size', 2000)
         n_wall_points = tensors['x'].shape[0]
 
-        loss_wss_total = 0.0
+        loss_wss_total = torch.tensor(0.0, device=self.device)
         wss_pred_list = []
 
         for i in range(0, n_wall_points, wall_batch_size):
@@ -513,7 +513,7 @@ class TAATrainer:
         interior_batch_size = physics_cfg.get('interior_batch_size', 500)
         n_interior_points = tensors['x_interior'].shape[0]
 
-        loss_physics_total = 0.0
+        loss_physics_total = torch.tensor(0.0, device=self.device)
         residual_sums = {
             'momentum_x': 0.0, 'momentum_y': 0.0, 'momentum_z': 0.0, 'continuity': 0.0,
             'nut_mean': 0.0,
@@ -553,7 +553,7 @@ class TAATrainer:
         residuals = residual_sums
 
         # No-slip BC Loss - Process in batches
-        loss_bc_total = 0.0
+        loss_bc_total = torch.tensor(0.0, device=self.device)
         for i in range(0, n_wall_points, wall_batch_size):
             end_idx = min(i + wall_batch_size, n_wall_points)
 
@@ -567,7 +567,7 @@ class TAATrainer:
         loss_bc = loss_bc_total
 
         # Pressure Loss - Process in batches
-        loss_pressure_total = 0.0
+        loss_pressure_total = torch.tensor(0.0, device=self.device)
         for i in range(0, n_wall_points, wall_batch_size):
             end_idx = min(i + wall_batch_size, n_wall_points)
 
@@ -863,6 +863,7 @@ class TAATrainer:
 
             # ── ConFIG: combine into conflict-free direction ────────────────
             stacked = torch.stack(grad_vectors, dim=0)  # (3, D)
+            assert self.config_operator is not None
             combined_grad = self.config_operator.calculate_gradient(
                 stacked, losses=loss_values)
 
