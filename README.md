@@ -1,88 +1,40 @@
 # Physics-Informed Neural Networks for Hemodynamic Prediction in Thoracic Aortic Aneurysms
 
-> **A RANS-Constrained Sparse Data Approach with Learnable Turbulent Viscosity**
+> **A RANS-Constrained Sparse Data Approach**
+
+This repository contains the source code accompanying the paper:
+
+> *Physics-Informed Neural Networks for Hemodynamic Prediction in Thoracic Aortic Aneurysms: A RANS-Constrained Sparse Data Approach*
 
 ## Abstract
 
-Predicting hemodynamic parameters within thoracic aortic aneurysms (TAAs) is critical for assessing rupture and dissection risk in cardiovascular surgery. We present a physics-informed neural network (PINN) framework that learns from sparse CFD wall data — using approximately one-third of available measurements — whilst simultaneously enforcing Reynolds-averaged Navier–Stokes (RANS) equations with a learnable turbulent viscosity field. The approach integrates a non-Newtonian Carreau–Yasuda viscosity model to capture blood's shear-thinning behaviour, and predicts wall shear stress (WSS) patterns across multiple anatomically distinct aneurysm configurations spanning two diameters and three morphologies. A gradient-norm adaptive loss weighting scheme dynamically balances data-driven and physics-based loss terms, while an alternating dual-optimiser strategy ensures the turbulent viscosity network receives dedicated gradient signal. Evaluated on five completed configurations, the framework achieves a **mean WSS Pearson correlation of 0.929** and **mean absolute error of 0.174 Pa**.
-
-**Keywords:** Physics-Informed Neural Networks · Thoracic Aortic Aneurysms · Haemodynamics · Wall Shear Stress · RANS · Adaptive Loss Weighting · Sparse Data Learning
-
-## Motivation
-
-Traditional CFD simulations provide detailed haemodynamic information but demand substantial computational resources and time-consuming mesh generation for patient-specific geometries. PINNs offer an alternative by embedding physical laws directly into the learning process, enabling interpolation from sparse wall measurements while maintaining consistency with fundamental fluid mechanics. This framework demonstrates that clinically relevant WSS accuracy can be achieved from boundary-only data by enforcing conservation laws at interior collocation points.
-
-## Method Overview
-
-### Governing Equations
-
-The PINN solves the incompressible RANS equations in a quasi-steady formulation at two cardiac phases (systole and diastole):
-
-$$\nabla \cdot \mathbf{u} = 0$$
-
-$$\rho \, \mathbf{u} \cdot \nabla \mathbf{u} = -\nabla p + \nabla \cdot \boldsymbol{\tau}_{\text{eff}}$$
-
-where the effective stress combines a shear-dependent molecular viscosity (Carreau–Yasuda model) with a **learnable turbulent viscosity** $\nu_t(\mathbf{x}; t_{\text{phase}})$ output by a dedicated neural network branch — eliminating the need for explicit turbulence transport equations.
-
-### Network Architecture
-
-Four separate networks (Net_u, Net_v, Net_w, Net_p) each predict one scalar field from spatial coordinates and cardiac phase. Each uses Fourier feature encoding followed by residual blocks with Swish activation. A fifth network predicts the turbulent viscosity field.
-
-### Multi-Objective Loss
-
-The total loss balances four terms — WSS matching, RANS residuals, no-slip boundary conditions, and pressure matching — using gradient-norm adaptive weighting (Wang et al., 2021) with exponential moving average smoothing.
-
-### Non-Dimensionalisation
-
-All quantities are non-dimensionalised using characteristic scales derived from the data (vessel diameter, pressure-based velocity scale) for numerical stability.
-
-## Dataset
-
-CFD wall data from 6 patient-specific TAA geometries, each at systolic and diastolic cardiac phases (12 datasets total). Simulations were performed with the SST k–ω transition model and Carreau–Yasuda blood rheology.
-
-| Code | Morphology | Diameter | β | Type |
-|------|------------|----------|------|------|
-| AS5 | Axisymmetric | 5.0 cm | 1.00 | Fusiform |
-| AS6 | Axisymmetric | 6.0 cm | 1.00 | Fusiform |
-| AD5 | Anterior-Dominant | 5.0 cm | 0.56 | Saccular |
-| AD6 | Anterior-Dominant | 6.0 cm | 0.62 | Saccular |
-| PD5 | Posterior-Dominant | 5.0 cm | 1.78 | Saccular |
-| PD6 | Posterior-Dominant | 6.0 cm | 1.61 | Saccular |
-
-Each CSV contains wall surface coordinates (X, Y, Z), pressure, and WSS vector components. Wall points are subsampled to ~7,085 points per phase.
+We present a physics-informed neural network (PINN) framework for predicting hemodynamic fields in thoracic aortic aneurysms (TAAs). The model learns from sparse CFD wall data — using approximately one-third of available measurements — whilst enforcing Reynolds-averaged Navier–Stokes (RANS) equations with a learnable turbulent viscosity field. The framework incorporates non-Newtonian Carreau–Yasuda blood rheology, pulsatile inlet conditions, and a gradient-norm adaptive loss weighting scheme that dynamically balances data-driven and physics-based objectives. An alternating dual-optimiser strategy ensures the turbulent viscosity network receives dedicated gradient signal from the governing equations. Evaluated across six anatomically distinct aneurysm configurations spanning two diameters and three morphologies, the framework achieves a mean WSS Pearson correlation of 0.929 and mean absolute error of 0.174 Pa.
 
 ## Repository Structure
 
 ```
 TAA-aneurysm/
-├── data/                       # CFD wall data (CSV, 12 files)
+├── data/                       # CFD simulation data (CSV files)
 ├── src/
 │   ├── data/loader.py          # Data loading and non-dimensionalisation
 │   ├── models/
-│   │   ├── networks.py         # TAANet architecture (Fourier + residual)
+│   │   ├── networks.py         # Network architecture (Fourier + residual MLP)
 │   │   ├── blocks.py           # Residual blocks, Swish activation
 │   │   └── fourier.py          # Fourier feature encoding
 │   ├── losses/
 │   │   ├── wss.py              # WSS loss computation
 │   │   ├── physics.py          # RANS residual loss
 │   │   └── boundary.py         # No-slip and pressure boundary losses
-│   ├── training/trainer.py     # Training loop with adaptive weighting
+│   ├── training/trainer.py     # Training loop with adaptive loss weighting
 │   └── utils/
-│       ├── geometry.py         # Wall normals, collocation sampling
-│       └── plotting.py         # CFD vs PINN comparison visualisation
-├── train.py                    # Entry-point script
-├── experiments/                # Output: metrics, figures, checkpoints
-└── requirements.txt
+│       ├── geometry.py         # Wall normals, collocation point sampling
+│       └── plotting.py         # Visualisation utilities
+├── experiments/                # Training outputs (metrics, figures)
+├── train.py                    # Entry point
+└── requirements.txt            # Python dependencies
 ```
 
-## Reproducing the Results
-
-### Prerequisites
-
-- Python 3.10+
-- CUDA-capable GPU (recommended)
-
-### Installation
+## Setup
 
 ```bash
 git clone https://github.com/michaelajao/TAA-aneurysm.git
@@ -90,42 +42,61 @@ cd TAA-aneurysm
 
 conda create -n taa_pinn python=3.10 -y
 conda activate taa_pinn
-
 pip install -r requirements.txt
 ```
 
-### Training
+**Requirements:** PyTorch ≥ 2.0, Open3D ≥ 0.17, NumPy, Pandas, Matplotlib, SciPy, PyYAML. A CUDA-capable GPU is recommended.
 
-Training requires a YAML configuration file specifying the geometry, data paths, model hyperparameters, and loss weights. See the paper for full hyperparameter details.
+## Usage
+
+Training is configured via YAML files passed to `train.py`:
 
 ```bash
-# Train on a specific geometry
-python -u -m src.training.trainer --config <path-to-config.yaml>
-
-# Resume from checkpoint
-python -u -m src.training.trainer --config <path-to-config.yaml> \
-  --resume experiments/<GEOM>/best_model.pt
+python train.py --config <path_to_config>.yaml
 ```
 
-## Key References
+Each configuration specifies the geometry, data file paths, model hyperparameters, and loss weights. Refer to the existing source code (particularly `src/training/trainer.py` and `src/data/loader.py`) for the full set of configurable options.
 
-- Raissi, M., Perdikaris, P., & Karniadakis, G.E. (2019). "Physics-informed neural networks: A deep learning framework for solving forward and inverse problems." *J. Comput. Phys.*, 378, 686–707.
-- Wang, S., Teng, Y., & Perdikaris, P. (2021). "Understanding and mitigating gradient flow pathologies in physics-informed neural networks." *SIAM J. Sci. Comput.*, 43(5), A3055–A3081.
-- Arzani, A., Wang, J.X., & D'Souza, R.M. (2021). "Uncovering near-wall blood flow from sparse data with physics-informed neural networks." *Physics of Fluids*, 33(7).
+To resume from a checkpoint:
 
-## License
+```bash
+python train.py --config <path_to_config>.yaml --resume <path_to_checkpoint>.pt
+```
 
-This project is part of ongoing research. Please contact the authors before reuse.
+## Dataset
 
-<!-- ## Citation
+CFD wall data from six TAA geometries, each resolved at systolic and diastolic cardiac phases (12 datasets total). Simulations were performed using the SST *k*–*ω* transition model with Carreau–Yasuda rheology.
 
-If you use this code in your research, please cite:
+| Code | Morphology | Diameter |
+|------|------------|----------|
+| AS5 | Axisymmetric (fusiform) | 5 cm |
+| AS6 | Axisymmetric (fusiform) | 6 cm |
+| AD5 | Anterior-dominant (saccular) | 5 cm |
+| AD6 | Anterior-dominant (saccular) | 6 cm |
+| PD5 | Posterior-dominant (saccular) | 5 cm |
+| PD6 | Posterior-dominant (saccular) | 6 cm |
+
+Each CSV contains wall surface coordinates (*X*, *Y*, *Z*), pressure, and WSS vector components.
+
+## Method Overview
+
+The framework uses five scalar-valued neural networks sharing the input (*x*, *y*, *z*, *t*_phase): four for the flow variables (*u*, *v*, *w*, *p*) and one for the learnable turbulent viscosity *ν*_t. Each branch employs Fourier feature encoding followed by a residual MLP with Swish activations. The total loss combines WSS matching, RANS momentum and continuity residuals, no-slip boundary enforcement, and pressure supervision, balanced by gradient-norm adaptive weighting (Wang et al., 2021). Full methodological details are provided in the accompanying paper.
+
+## Citation
 
 ```bibtex
-@article{taa_pinn_2026,
-  title={Physics-Informed Neural Networks for Hemodynamic Prediction in Thoracic Aortic Aneurysms: A RANS-Constrained Sparse Data Approach},
-  author={},
-  year={2026}
+@article{ajao2026taa_pinn,
+  title   = {Physics-Informed Neural Networks for Hemodynamic Prediction in
+             Thoracic Aortic Aneurysms: A RANS-Constrained Sparse Data Approach},
+  author  = {Ajao, Michael and {others}},
+  journal = {},
+  year    = {2026},
+  note    = {Manuscript in preparation}
 }
 ```
--->
+
+## References
+
+- Raissi, M., Perdikaris, P., & Karniadakis, G. E. (2019). Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations. *Journal of Computational Physics*, 378, 686–707.
+- Wang, S., Teng, Y., & Perdikaris, P. (2021). Understanding and mitigating gradient flow pathologies in physics-informed neural networks. *SIAM Journal on Scientific Computing*, 43(5), A3055–A3081.
+- Tancik, M., et al. (2020). Fourier features let networks learn high frequency functions in low dimensional domains. *NeurIPS 2020*.
