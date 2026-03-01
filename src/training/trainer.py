@@ -34,7 +34,7 @@ from src.losses.boundary import (compute_noslip_loss, compute_pressure_loss,
                                  detect_inlet_outlet, generate_cross_section_points,
                                  compute_inlet_velocity_loss, compute_outlet_pressure_loss)
 
-from conflictfree.grad_operator import ConFIGOperator
+from conflictfree.grad_operator import ConFIGOperator  # type: ignore
 
 
 class TAATrainer:
@@ -651,22 +651,18 @@ class TAATrainer:
                           + loss_pressure + loss_inlet + loss_outlet
                           + loss_nut_reg)
         elif self.adaptive_weights_enabled and self.adaptive_weights:
-            lambda_physics = weights['lambda_physics']
-            if self.physics_ramp_epochs > 0 and self.epoch > 0:
-                ramp_factor = min(1.0, self.epoch / self.physics_ramp_epochs)
-                lambda_physics *= ramp_factor
-            aw_physics = self.adaptive_weights.get('physics', 1.0)
+            aw_physics = self.adaptive_weights['physics']
             if self.physics_ramp_epochs > 0 and self.epoch > 0:
                 ramp_factor = min(1.0, self.epoch / self.physics_ramp_epochs)
                 aw_physics *= ramp_factor
             total_loss = (
-                self.adaptive_weights.get('wss', 1.0) * loss_wss +
+                self.adaptive_weights['wss'] * loss_wss +
                 aw_physics * loss_physics +
-                self.adaptive_weights.get('bc_noslip', 1.0) * loss_bc +
-                self.adaptive_weights.get('pressure', 1.0) * loss_pressure +
-                self.adaptive_weights.get('inlet', lambda_inlet) * loss_inlet +
-                self.adaptive_weights.get('outlet', lambda_outlet) * loss_outlet +
-                self.adaptive_weights.get('nut_reg', 1.0) * loss_nut_reg
+                self.adaptive_weights['bc_noslip'] * loss_bc +
+                self.adaptive_weights['pressure'] * loss_pressure +
+                self.adaptive_weights['inlet'] * loss_inlet +
+                self.adaptive_weights['outlet'] * loss_outlet +
+                self.adaptive_weights['nut_reg'] * loss_nut_reg
             )
         else:
             lambda_physics = weights['lambda_physics']

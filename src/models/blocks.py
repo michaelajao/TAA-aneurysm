@@ -4,6 +4,7 @@ Residual blocks for deeper PINN architectures
 
 import torch
 import torch.nn as nn
+from typing import Optional
 
 
 class Swish(nn.Module):
@@ -34,7 +35,7 @@ class ResidualBlock(nn.Module):
 
     def __init__(self,
                  dim: int,
-                 activation: nn.Module = None):
+                 activation: Optional[nn.Module] = None):
         """
         Args:
             dim: Hidden dimension

@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 import torch
 import os
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional, List, Any
 
 
 class TAADataLoader:
@@ -132,11 +132,11 @@ class TAADataLoader:
             wss_y = df['Wall Shear Y [ Pa ]'].values.astype(float)
             wss_z = df['Wall Shear Z [ Pa ]'].values.astype(float)
 
-            coords = np.column_stack([
-                df['X [ m ]'].values.astype(float),
-                df['Y [ m ]'].values.astype(float),
-                df['Z [ m ]'].values.astype(float),
-            ])
+            coords = np.column_stack((
+                df['X [ m ]'].to_numpy(dtype=float),
+                df['Y [ m ]'].to_numpy(dtype=float),
+                df['Z [ m ]'].to_numpy(dtype=float),
+            ))
             coords_mean = coords.mean(axis=0)
             coords_nd = (coords - coords_mean) / self.L_ref
 
@@ -216,7 +216,7 @@ class TAADataLoader:
 
     def load_single_case(self,
                         filename: str,
-                        subsample_factor: int = 1) -> Dict[str, np.ndarray]:
+                        subsample_factor: int = 1) -> Dict[str, Any]:
         """
         Load a single CSV file and extract standardised training data.
 
@@ -236,10 +236,9 @@ class TAADataLoader:
         Returns:
             Dictionary with normalised data and raw values.
         """
-        if self.U_ref is None:
-            raise RuntimeError(
-                "Reference scales not computed. Call compute_reference_scales() first."
-            )
+        if (self.U_ref is None or self.P_ref is None or self.tau_ref is None or
+            self.coord_scale is None or self.pressure_std is None or self.wss_std is None):
+            raise ValueError("Reference scales not computed. Call compute_reference_scales() first.")
 
         filepath = os.path.join(self.data_dir, filename)
 
@@ -253,10 +252,10 @@ class TAADataLoader:
         df = df.dropna().reset_index(drop=True)
 
         # Compute centering mean from FULL dataset BEFORE subsampling
-        x_full = df['X [ m ]'].values.astype(float)
-        y_full = df['Y [ m ]'].values.astype(float)
-        z_full = df['Z [ m ]'].values.astype(float)
-        coords_full = np.column_stack([x_full, y_full, z_full])
+        x_full = df['X [ m ]'].to_numpy(dtype=float)
+        y_full = df['Y [ m ]'].to_numpy(dtype=float)
+        z_full = df['Z [ m ]'].to_numpy(dtype=float)
+        coords_full = np.column_stack((x_full, y_full, z_full))
         coords_mean = coords_full.mean(axis=0)
 
         # Subsample AFTER computing the full mean
@@ -264,10 +263,10 @@ class TAADataLoader:
             df = df.iloc[::subsample_factor].reset_index(drop=True)
 
         # Extract coordinates
-        x = df['X [ m ]'].values.astype(float)
-        y = df['Y [ m ]'].values.astype(float)
-        z = df['Z [ m ]'].values.astype(float)
-        coords = np.column_stack([x, y, z])
+        x = df['X [ m ]'].to_numpy(dtype=float)
+        y = df['Y [ m ]'].to_numpy(dtype=float)
+        z = df['Z [ m ]'].to_numpy(dtype=float)
+        coords = np.column_stack((x, y, z))
 
         # ── Step 1: Non-dimensionalise coordinates ───────────────────────────
         coords_centered = coords - coords_mean
@@ -277,19 +276,19 @@ class TAADataLoader:
         coords_nondim = coords_nondim / self.coord_scale
 
         # ── Step 1+2: Non-dimensionalise + standardise pressure ──────────────
-        pressure = df['Pressure [ Pa ]'].values.astype(float).reshape(-1, 1)
+        pressure = df['Pressure [ Pa ]'].to_numpy(dtype=float).reshape(-1, 1)
         pressure_nondim = pressure / self.P_ref               # non-dim
         pressure_std = pressure_nondim / self.pressure_std    # standardised
 
         # ── Step 1+2: Non-dimensionalise + standardise WSS ───────────────────
-        wss_x = df['Wall Shear X [ Pa ]'].values.astype(float)
-        wss_y = df['Wall Shear Y [ Pa ]'].values.astype(float)
-        wss_z = df['Wall Shear Z [ Pa ]'].values.astype(float)
-        wss_components = np.column_stack([wss_x, wss_y, wss_z])
+        wss_x = df['Wall Shear X [ Pa ]'].to_numpy(dtype=float)
+        wss_y = df['Wall Shear Y [ Pa ]'].to_numpy(dtype=float)
+        wss_z = df['Wall Shear Z [ Pa ]'].to_numpy(dtype=float)
+        wss_components = np.column_stack((wss_x, wss_y, wss_z))
         wss_nondim = wss_components / self.tau_ref            # non-dim
         wss_std = wss_nondim / self.wss_std                   # standardised
 
-        wss_magnitude = df['Wall Shear [ Pa ]'].values.astype(float).reshape(-1, 1)
+        wss_magnitude = df['Wall Shear [ Pa ]'].to_numpy(dtype=float).reshape(-1, 1)
         wss_mag_nondim = wss_magnitude / self.tau_ref
         wss_mag_std = wss_mag_nondim / self.wss_std
 
@@ -389,7 +388,7 @@ class TAADataLoader:
 
         # Phase (repeated for all points)
         if include_phase:
-            phase = torch.full((x.shape[0], 1), data['phase'],
+            phase = torch.full((x.shape[0], 1), float(data['phase']),
                              dtype=torch.float32, device=self.device)
             tensors['phase'] = phase
 

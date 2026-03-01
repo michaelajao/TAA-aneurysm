@@ -86,7 +86,7 @@ class TAANet(nn.Module):
             output: (N, 1) output scalar field
         """
         # Fourier encoding (if enabled)
-        if self.use_fourier:
+        if self.fourier is not None:
             x = self.fourier(x)
 
         # Encoder
