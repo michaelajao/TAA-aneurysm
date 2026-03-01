@@ -106,7 +106,7 @@ class TAATrainer:
         self.adaptive_weights_enabled = aw_cfg.get('enabled', False)
         self.adaptive_weights_alpha = aw_cfg.get('alpha', 0.1)
         self.adaptive_weights_update_interval = aw_cfg.get('update_interval', 100)
-        self.adaptive_weights_ref_loss = aw_cfg.get('reference_loss', 'wss')
+        self.adaptive_weights_ref_loss = aw_cfg.get('ref_loss', 'wss')
         self.physics_weight_floor = aw_cfg.get('physics_weight_floor', 0.0)
         self.adaptive_weights = {}  # {name: float} -- populated on first update
         self._last_grad_norms = {}  # for logging: most recent per-loss grad norms

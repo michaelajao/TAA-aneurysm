@@ -63,37 +63,3 @@ class ResidualBlock(nn.Module):
         return x + residual  # Skip connection — no extra activation
 
 
-class ResidualBlockWithNorm(nn.Module):
-    """
-    Residual block with layer normalization for improved training stability.
-    """
-
-    def __init__(self,
-                 dim: int,
-                 activation: nn.Module = None,
-                 use_norm: bool = True):
-        """
-        Args:
-            dim: Hidden dimension
-            activation: Activation function
-            use_norm: Whether to use layer normalization
-        """
-        super().__init__()
-
-        if activation is None:
-            activation = Swish()
-
-        layers = []
-        if use_norm:
-            layers.append(nn.LayerNorm(dim))
-        layers.append(nn.Linear(dim, dim))
-        layers.append(activation)
-        if use_norm:
-            layers.append(nn.LayerNorm(dim))
-        layers.append(nn.Linear(dim, dim))
-
-        self.layer = nn.Sequential(*layers)
-
-    def forward(self, x):
-        residual = self.layer(x)
-        return x + residual  # No extra activation after skip connection

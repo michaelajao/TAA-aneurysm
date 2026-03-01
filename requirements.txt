@@ -8,4 +8,6 @@ matplotlib>=3.7
 pyyaml>=6.0
 tqdm>=4.65
 open3d>=0.17
-scipy>=1.10
+plotly>=5.15
+kaleido>=0.2
+conflictfree>=0.1

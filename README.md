@@ -45,7 +45,7 @@ conda activate taa_pinn
 pip install -r requirements.txt
 ```
 
-**Requirements:** PyTorch ≥ 2.0, Open3D ≥ 0.17, NumPy, Pandas, Matplotlib, SciPy, PyYAML. A CUDA-capable GPU is recommended.
+**Requirements:** PyTorch >= 2.0, Open3D >= 0.17, Plotly >= 5.15, ConflictFree >= 0.1, NumPy, Pandas, Matplotlib, PyYAML. A CUDA-capable GPU is recommended.
 
 ## Dataset
 
