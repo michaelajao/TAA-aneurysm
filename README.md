@@ -10,30 +10,6 @@ This repository contains the source code accompanying the paper:
 
 We present a physics-informed neural network (PINN) framework for predicting hemodynamic fields in thoracic aortic aneurysms (TAAs). The model learns from sparse CFD wall data — using approximately one-third of available measurements — whilst enforcing Reynolds-averaged Navier–Stokes (RANS) equations with a learnable turbulent viscosity field. The framework incorporates non-Newtonian Carreau–Yasuda blood rheology, pulsatile inlet conditions, and a gradient-norm adaptive loss weighting scheme that dynamically balances data-driven and physics-based objectives. An alternating dual-optimiser strategy ensures the turbulent viscosity network receives dedicated gradient signal from the governing equations. Evaluated across six anatomically distinct aneurysm configurations spanning two diameters and three morphologies, the framework achieves a mean WSS Pearson correlation of 0.929 and mean absolute error of 0.174 Pa.
 
-## Repository Structure
-
-```
-TAA-aneurysm/
-├── data/                       # CFD simulation data (CSV files)
-├── src/
-│   ├── data/loader.py          # Data loading and non-dimensionalisation
-│   ├── models/
-│   │   ├── networks.py         # Network architecture (Fourier + residual MLP)
-│   │   ├── blocks.py           # Residual blocks, Swish activation
-│   │   └── fourier.py          # Fourier feature encoding
-│   ├── losses/
-│   │   ├── wss.py              # WSS loss computation
-│   │   ├── physics.py          # RANS residual loss
-│   │   └── boundary.py         # No-slip and pressure boundary losses
-│   ├── training/trainer.py     # Training loop with adaptive loss weighting
-│   └── utils/
-│       ├── geometry.py         # Wall normals, collocation point sampling
-│       └── plotting.py         # Visualisation utilities
-├── experiments/                # Training outputs (metrics, figures)
-├── train.py                    # Entry point
-└── requirements.txt            # Python dependencies
-```
-
 ## Setup
 
 ```bash
