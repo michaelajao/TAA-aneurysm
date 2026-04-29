@@ -250,10 +250,3 @@ CUDA_VISIBLE_DEVICES=0 python train.py --config configs/AS5_config.yaml
 }
 ```
 
-## References
-
-- Raissi, M., Perdikaris, P., & Karniadakis, G. E. (2019). Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations. *Journal of Computational Physics*, 378, 686–707.
-- Wang, S., Teng, Y., & Perdikaris, P. (2021). Understanding and mitigating gradient flow pathologies in physics-informed neural networks. *SIAM Journal on Scientific Computing*, 43(5), A3055–A3081.
-- Arzani, A., Wang, J.-X., & D'Souza, R. M. (2021). Uncovering near-wall blood flow from sparse data with physics-informed neural networks. *Physics of Fluids*, 33(7), 071905.
-- Ur Rehman, H., et al. (2025). Physics-informed neural networks for fluid–structure interaction analysis of pulsatile flow in arterial aneurysms associated with Marfan syndrome. *Computer Methods in Applied Mechanics and Engineering*.
-- Tancik, M., et al. (2020). Fourier features let networks learn high frequency functions in low dimensional domains. *NeurIPS 2020*.
