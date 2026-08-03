@@ -35,7 +35,4 @@ KFAS_Paper/
 # Claude AI
 .claude/
 
-# Machine-specific configs and scripts
-configs/
-scripts/
 CHANGELOG.md
