@@ -159,6 +159,23 @@ def compute_nut_from_network(networks, x, y, z, t_phase):
     return nut
 
 
+def compute_velocity_from_networks(networks, x, y, z, t_phase, U_ref):
+    """Predicted velocity components and magnitude in physical units (m/s).
+
+    Note: validation against CFD is meaningful only at interior points.  The wall
+    surface satisfies no-slip in the CFD export (all velocity columns are zero),
+    so plotting predicted wall velocity verifies that the network has learned the
+    no-slip condition rather than validating the lumen flow field.
+    """
+    inp = torch.cat([x, y, z, t_phase], dim=1)
+    with torch.no_grad():
+        u = networks["u"](inp).view(-1, 1) * U_ref
+        v = networks["v"](inp).view(-1, 1) * U_ref
+        w = networks["w"](inp).view(-1, 1) * U_ref
+        u_mag = torch.sqrt(u ** 2 + v ** 2 + w ** 2 + 1e-12)
+    return u, v, w, u_mag
+
+
 def compute_wss_from_networks(networks, x, y, z, t_phase, normals,
                               tau_ref, wss_std=1.0, pressure_std=1.0,
                               coord_scale=1.0):
@@ -229,6 +246,7 @@ FIELD_LABELS = {
     "WSS_y": r"$\tau_{w,y}$ (Pa)",
     "WSS_z": r"$\tau_{w,z}$ (Pa)",
     "Pressure": r"$p$ (Pa)",
+    "Velocity_magnitude": r"$|\mathbf{u}|$ (m/s)",
     "nut": r"$\bar{\nu}_t$",
 }
 
@@ -560,6 +578,7 @@ def compute_metrics_from_checkpoint(geom, checkpoint_path=None, device="cuda"):
     L = norm["length_scale"]
     ref_scales = ckpt.get("ref_scales", {})
     P_ref = ref_scales.get("P_ref", 1.0)
+    U_ref = ref_scales.get("U_ref", 1.0)
     tau_ref = ref_scales.get("tau_ref", 1.0)
     wss_std = ref_scales.get("wss_std", 1.0)
     pressure_std = ref_scales.get("pressure_std", 1.0)
@@ -914,6 +933,7 @@ def process_geometry(geom, checkpoint_path=None, device="cuda"):
 
     ref_scales = ckpt.get("ref_scales", {})
     P_ref = ref_scales.get("P_ref", 1.0)
+    U_ref = ref_scales.get("U_ref", 1.0)
     tau_ref = ref_scales.get("tau_ref", 1.0)
     wss_std = ref_scales.get("wss_std", 1.0)
     pressure_std = ref_scales.get("pressure_std", 1.0)
@@ -1012,7 +1032,25 @@ def process_geometry(geom, checkpoint_path=None, device="cuda"):
         plot_field_comparison(coords_full_raw, cfd_wss_z, pinn_wss_z,
                               geom, phase, "WSS_z", out_dir, planes=COMPONENT_PLANES)
 
-        # 4) Turbulent viscosity field (XY and XZ planes)
+        # 4) Velocity-magnitude comparison (wall surface).  CFD wall-velocity is
+        #    identically zero (no-slip) so the "ground truth" is taken as zero;
+        #    the plot therefore visualises whether the network has learned the
+        #    no-slip condition.  Lumen-interior velocity validation requires CFD
+        #    volume exports that are not part of the present dataset.
+        print("    Plotting velocity magnitude (wall, sanity check)...")
+        vel_mag_list = []
+        for i in range(0, n_pts, batch):
+            j = min(i + batch, n_pts)
+            _u, _v, _w, _vmag = compute_velocity_from_networks(
+                networks, x[i:j], y[i:j], z[i:j], t[i:j], U_ref=U_ref,
+            )
+            vel_mag_list.append(_vmag.cpu())
+        pinn_vel_mag = torch.cat(vel_mag_list).numpy().flatten()
+        cfd_vel_mag = np.zeros_like(pinn_vel_mag)  # no-slip
+        plot_field_comparison(coords_full_raw, cfd_vel_mag, pinn_vel_mag,
+                              geom, phase, "Velocity_magnitude", out_dir)
+
+        # 5) Turbulent viscosity field (XY and XZ planes)
         if "nut" in networks:
             print("    Plotting turbulent viscosity (XY, XZ)...")
             nut_list = []
@@ -1040,7 +1078,7 @@ def process_geometry(geom, checkpoint_path=None, device="cuda"):
                 fig.savefig(p_out, dpi=300)
                 plt.close(fig)
 
-        # 5) 3D Plotly plots (WSS and Pressure)
+        # 6) 3D Plotly plots (WSS and Pressure)
         print("    Plotting 3D WSS surface (Plotly)...")
         plot_3d_wss_surface(coords_full_raw, cfd_wss_mag, pinn_wss_mag,
                             geom, phase, out_dir)
